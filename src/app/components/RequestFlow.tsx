@@ -141,13 +141,11 @@ function formatTimestamp(
 ): string {
   const date = new Date(timestamp);
   if (options?.fractionalSeconds) {
-    return date.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      fractionalSecondDigits: 3,
-      hour12: false,
-    });
+    const h = String(date.getHours()).padStart(2, '0');
+    const m = String(date.getMinutes()).padStart(2, '0');
+    const s = String(date.getSeconds()).padStart(2, '0');
+    const ms = String(date.getMilliseconds()).padStart(3, '0');
+    return `${h}:${m}:${s}.${ms}`;
   }
   return date.toLocaleString('en-US', {
     month: 'short',
@@ -184,7 +182,10 @@ function buildSequence(flow: RequestFlowNode[], services: string[]): SeqEvent[] 
     });
   }
 
-  const errorIdx = flow.findLastIndex((n) => n.status === 'error');
+  let errorIdx = -1;
+  for (let j = flow.length - 1; j >= 0; j--) {
+    if (flow[j].status === 'error') { errorIdx = j; break; }
+  }
 
   for (let i = flow.length - 1; i >= 1; i--) {
     const from = flow[i];
