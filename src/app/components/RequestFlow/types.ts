@@ -9,14 +9,6 @@ export type Status = 'success' | 'error' | 'pending';
 
 // ─── Data models ─────────────────────────────────────────────────────────────
 
-export interface LogStep {
-  id: string;
-  timestamp: string;
-  message: string;
-  level: LogLevel;
-  details?: string;
-}
-
 export interface Log {
   id: string;
   timestamp: string;
@@ -26,7 +18,6 @@ export interface Log {
   message: string;
   host: string;
   requestId?: string;
-  steps: LogStep[];
   requestFlow?: RequestFlowNode[];
 }
 

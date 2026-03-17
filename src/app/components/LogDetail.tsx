@@ -8,7 +8,7 @@ import {
   Category,
 } from '@mui/icons-material';
 import { Box, Typography, Button, useTheme, useMediaQuery } from '@mui/material';
-import { mockLogs, LogLevel } from '../utils/mockLogs';
+import { mockLogs } from '../utils/mockLogs';
 import { formatTimestamp } from '../utils/format';
 import { LevelChip, Card, StatCard, EmptyState } from './ui';
 
@@ -37,24 +37,11 @@ export default function LogDetail() {
     );
   }
 
-  const formatStepTime = (ts: string) =>
-    formatTimestamp(ts, { fractionalSeconds: true });
-
-  const hasError = log.steps.some((s) => s.level === 'error');
-  const errorStepIndex = log.steps.findIndex((s) => s.level === 'error');
-
   const metadataItems = [
     { icon: <AccessTime />, label: 'Timestamp', value: formatTimestamp(log.timestamp, { includeYear: true }) },
     { icon: <Category />, label: 'Container', value: log.container, mono: true },
     { icon: <Dns />, label: 'Service', value: log.service },
   ];
-
-  const getStepCircleStyles = (level: LogLevel, isError: boolean) => {
-    if (isError) return { bgcolor: 'error.light', borderColor: 'error.main', color: 'error.dark' };
-    if (level === 'success') return { bgcolor: 'success.light', borderColor: 'success.main', color: 'success.dark' };
-    if (level === 'warn') return { bgcolor: 'warning.light', borderColor: 'warning.main', color: 'warning.dark' };
-    return { bgcolor: 'background.paper', borderColor: 'divider', color: 'text.secondary' };
-  };
 
   return (
     <Box sx={{ maxWidth: 1024, mx: 'auto' }}>

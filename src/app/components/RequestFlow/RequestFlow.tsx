@@ -4,12 +4,10 @@ import { Error as ErrorIcon, ArrowForward, ArrowBack } from '@mui/icons-material
 
 import type { NodeType, Status, RequestFlowProps } from './types';
 import { COL_W, TS_W, ROW_H } from './constants';
-import { getColor, formatDuration, formatDurationPrecise, buildSequence } from './helpers';
+import { getColor, buildSequence } from './helpers';
 
 import Card from './ui/Card';
-import StatCard from './ui/StatCard';
 import EmptyState from './ui/EmptyState';
-import FooterStat from './ui/FooterStat';
 import ErrorBanner from './ErrorBanner';
 import DetailPanel from './DetailPanel';
 import { Participant, SvgArrow, MsgLabel, Lifeline } from './SequenceDiagram';
@@ -62,14 +60,6 @@ export default function RequestFlow({ requestId, logs, onViewLog }: RequestFlowP
 
   const seqEvents = useMemo(() => buildSequence(flow, services), [flow, services]);
 
-  const totalDuration = useMemo(() => {
-    if (requestLogs.length < 2) return 0;
-    return new Date(requestLogs[requestLogs.length - 1].timestamp).getTime()
-      - new Date(requestLogs[0].timestamp).getTime();
-  }, [requestLogs]);
-
-  const errorCount = requestLogs.filter((l) => l.level === 'error').length;
-  const warnCount = requestLogs.filter((l) => l.level === 'warn').length;
   const errorNode = flow.find((n) => n.status === 'error');
 
   // ─── Expand / collapse ───────────────────────────────────────────────────
@@ -167,14 +157,6 @@ export default function RequestFlow({ requestId, logs, onViewLog }: RequestFlowP
       </Box>
 
       {errorNode && <ErrorBanner node={errorNode} isDark={isDark} />}
-
-      {/* Stats */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(4, 1fr)' }, gap: 1.5, mb: 3 }}>
-        <StatCard label="Services" value={services.length} />
-        <StatCard label="Log Entries" value={requestLogs.length} />
-        <StatCard label="Duration" value={formatDuration(totalDuration)} />
-        <StatCard label="Errors" value={errorCount} valueColor={errorCount > 0 ? 'error' : undefined} />
-      </Box>
 
       {/* Legend */}
       <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -279,18 +261,6 @@ export default function RequestFlow({ requestId, logs, onViewLog }: RequestFlowP
           </Box>
         </Box>
 
-        {/* Footer */}
-        <Box sx={{
-          p: 2.5, borderTop: 2, borderColor: 'divider',
-          display: 'flex', flexWrap: 'wrap', gap: 3, alignItems: 'center',
-          bgcolor: isDark ? alpha('#fff', 0.01) : alpha('#000', 0.01),
-        }}>
-          <FooterStat label="Total Duration" value={formatDurationPrecise(totalDuration)} mono />
-          <FooterStat label="Services" value={String(services.length)} />
-          <FooterStat label="Steps" value={String(requestLogs.reduce((s, l) => s + l.steps.length, 0))} />
-          {errorCount > 0 && <FooterStat label="Errors" value={String(errorCount)} color="#ef4444" />}
-          {warnCount > 0 && <FooterStat label="Warnings" value={String(warnCount)} color="#f59e0b" />}
-        </Box>
       </Card>
     </Box>
   );
