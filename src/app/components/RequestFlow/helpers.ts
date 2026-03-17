@@ -1,5 +1,5 @@
 import { SERVICE_COLORS } from './constants';
-import type { RequestFlowNode, SeqEvent } from './types';
+import type { FlowEdge, SeqEvent } from './types';
 
 export const getColor = (i: number): string =>
   SERVICE_COLORS[i % SERVICE_COLORS.length];
@@ -37,64 +37,32 @@ export function formatDurationPrecise(ms: number): string {
   return ms > 1000 ? `${(ms / 1000).toFixed(2)}s` : `${ms}ms`;
 }
 
+/**
+ * Преобразует рёбра графа в массив SeqEvent для отрисовки.
+ * Каждое ребро (FlowEdge) = одна стрелка на диаграмме.
+ */
 export function buildSequence(
-  flow: RequestFlowNode[],
+  edges: FlowEdge[],
   services: string[],
 ): SeqEvent[] {
-  if (flow.length < 2) return [];
+  if (edges.length === 0) return [];
 
   const colOf = (name: string): number => {
     const idx = services.indexOf(name);
     return idx !== -1 ? idx : 0;
   };
 
-  const events: SeqEvent[] = [];
-
-  // Forward (request) arrows
-  for (let i = 0; i < flow.length - 1; i++) {
-    const from = flow[i];
-    const to = flow[i + 1];
-    events.push({
-      id: `fwd-${i}`,
-      fromCol: colOf(from.name),
-      toCol: colOf(to.name),
-      label: from.details || `→ ${to.name}`,
-      status: to.status === 'error' && i === flow.length - 2 ? 'error' : 'success',
-      isResponse: false,
-      timestamp: to.timestamp,
-    });
-  }
-
-  // Find last error index
-  let errorIdx = -1;
-  for (let j = flow.length - 1; j >= 0; j--) {
-    if (flow[j].status === 'error') {
-      errorIdx = j;
-      break;
-    }
-  }
-
-  // Return (response) arrows
-  for (let i = flow.length - 1; i >= 1; i--) {
-    const from = flow[i];
-    const to = flow[i - 1];
-    const isErr = from.status === 'error' || (errorIdx >= 0 && i >= errorIdx);
-
-    events.push({
-      id: `ret-${i}`,
-      fromCol: colOf(from.name),
-      toCol: colOf(to.name),
-      label: isErr
-        ? (from.status === 'error' ? from.details || 'Error' : 'Error propagated')
-        : `${from.duration ? from.duration + 'ms' : 'OK'}`,
-      details: from.details,
-      status: isErr ? 'error' : 'success',
-      duration: from.duration,
-      isResponse: true,
-      timestamp: from.timestamp,
-      isErrorSource: i === errorIdx,
-    });
-  }
-
-  return events;
+  return edges.map((edge) => ({
+    id: edge.id,
+    fromCol: colOf(edge.from),
+    toCol: colOf(edge.to),
+    label: edge.label || (edge.type === 'response'
+      ? (edge.status === 'error' ? 'Error' : `${edge.duration ? edge.duration + 'ms' : 'OK'}`)
+      : `→ ${edge.to}`),
+    status: edge.status,
+    duration: edge.duration,
+    isResponse: edge.type === 'response',
+    timestamp: edge.timestamp,
+    isErrorSource: edge.isErrorSource,
+  }));
 }

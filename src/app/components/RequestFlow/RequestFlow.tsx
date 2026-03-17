@@ -28,39 +28,41 @@ export default function RequestFlow({ requestId, logs, onViewLog }: RequestFlowP
   );
 
   const primaryLog = useMemo(
-    () => requestLogs.find((l) => l.requestFlow && l.requestFlow.length > 0),
+    () => requestLogs.find((l) => l.requestFlow && l.requestFlow.edges.length > 0),
     [requestLogs],
   );
 
-  const flow = primaryLog?.requestFlow ?? [];
+  const flow = primaryLog?.requestFlow;
+  const nodes = flow?.nodes ?? [];
+  const edges = flow?.edges ?? [];
 
   const services = useMemo(() => {
     const seen = new Set<string>();
     const result: string[] = [];
-    for (const node of flow) {
+    for (const node of nodes) {
       if (!seen.has(node.name)) {
         seen.add(node.name);
         result.push(node.name);
       }
     }
     return result;
-  }, [flow]);
+  }, [nodes]);
 
   const serviceTypes = useMemo(() => {
     const map: Record<string, NodeType> = {};
-    for (const n of flow) map[n.name] = n.type;
+    for (const n of nodes) map[n.name] = n.type;
     return map;
-  }, [flow]);
+  }, [nodes]);
 
   const serviceStatuses = useMemo(() => {
     const map: Record<string, Status> = {};
-    for (const n of flow) map[n.name] = n.status;
+    for (const n of nodes) map[n.name] = n.status;
     return map;
-  }, [flow]);
+  }, [nodes]);
 
-  const seqEvents = useMemo(() => buildSequence(flow, services), [flow, services]);
+  const seqEvents = useMemo(() => buildSequence(edges, services), [edges, services]);
 
-  const errorNode = flow.find((n) => n.status === 'error');
+  const errorNode = nodes.find((n) => n.status === 'error');
 
   // ─── Expand / collapse ───────────────────────────────────────────────────
 

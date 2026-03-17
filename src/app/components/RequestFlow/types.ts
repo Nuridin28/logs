@@ -7,6 +7,35 @@ export type LogLevel = 'info' | 'warn' | 'error' | 'debug' | 'success';
 export type NodeType = 'client' | 'gateway' | 'service' | 'database' | 'external' | 'cache';
 export type Status = 'success' | 'error' | 'pending';
 
+// ─── Flow graph ──────────────────────────────────────────────────────────────
+
+/** Участник диаграммы (колонка) */
+export interface FlowNode {
+  id: string;
+  name: string;
+  type: NodeType;
+  status: Status;
+}
+
+/** Связь между участниками (стрелка) */
+export interface FlowEdge {
+  id: string;
+  from: string;
+  to: string;
+  type: 'request' | 'response';
+  timestamp: string;
+  status: Status;
+  duration?: number;
+  label?: string;
+  isErrorSource?: boolean;
+}
+
+/** Граф запроса: узлы + рёбра */
+export interface RequestFlow {
+  nodes: FlowNode[];
+  edges: FlowEdge[];
+}
+
 // ─── Data models ─────────────────────────────────────────────────────────────
 
 export interface Log {
@@ -18,17 +47,7 @@ export interface Log {
   message: string;
   host: string;
   requestId?: string;
-  requestFlow?: RequestFlowNode[];
-}
-
-export interface RequestFlowNode {
-  id: string;
-  name: string;
-  type: NodeType;
-  timestamp: string;
-  status: Status;
-  duration?: number;
-  details?: string;
+  requestFlow?: RequestFlow;
 }
 
 // ─── Sequence diagram ────────────────────────────────────────────────────────
