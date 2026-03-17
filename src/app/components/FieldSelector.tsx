@@ -1,5 +1,6 @@
-import { Settings } from 'lucide-react';
-import { useState } from 'react';
+import { Settings } from '@mui/icons-material';
+import React, { useState } from 'react';
+import { Box, Button, Menu, MenuItem, Typography, Checkbox, useTheme } from '@mui/material';
 
 interface Field {
   key: string;
@@ -13,55 +14,63 @@ interface FieldSelectorProps {
 }
 
 export default function FieldSelector({ fields, onFieldsChange }: FieldSelectorProps) {
-  const [isOpen, setIsOpen] = useState(false);
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const open = Boolean(anchorEl);
 
   const toggleField = (key: string) => {
-    const updatedFields = fields.map(field =>
+    const updatedFields = fields.map((field) =>
       field.key === key ? { ...field, enabled: !field.enabled } : field
     );
     onFieldsChange(updatedFields);
   };
 
   return (
-    <div className="relative">
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors text-slate-700 dark:text-slate-200"
+    <Box>
+      <Button
+        variant="outlined"
+        startIcon={<Settings />}
+        onClick={(e) => setAnchorEl(e.currentTarget)}
+        sx={{
+          borderColor: 'divider',
+          color: 'text.primary',
+          '&:hover': { borderColor: 'divider', bgcolor: isDark ? 'grey.800' : 'grey.100' },
+        }}
       >
-        <Settings className="w-4 h-4" />
-        <span>Select Fields</span>
-      </button>
-
-      {isOpen && (
-        <>
-          <div
-            className="fixed inset-0 z-10"
-            onClick={() => setIsOpen(false)}
-          />
-          <div className="absolute right-0 top-12 w-64 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg z-20">
-            <div className="p-3 border-b border-slate-200 dark:border-slate-700">
-              <p className="font-medium text-slate-900 dark:text-white">Display Fields</p>
-              <p className="text-sm text-slate-500 dark:text-slate-400">Choose which columns to show</p>
-            </div>
-            <div className="p-2 max-h-80 overflow-y-auto">
-              {fields.map(field => (
-                <label
-                  key={field.key}
-                  className="flex items-center gap-3 px-3 py-2 rounded hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer"
-                >
-                  <input
-                    type="checkbox"
-                    checked={field.enabled}
-                    onChange={() => toggleField(field.key)}
-                    className="w-4 h-4 text-blue-600 rounded border-slate-300 dark:border-slate-600 focus:ring-blue-500 dark:bg-slate-700"
-                  />
-                  <span className="text-sm text-slate-700 dark:text-slate-200">{field.label}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-        </>
-      )}
-    </div>
+        Select Fields
+      </Button>
+      <Menu
+        anchorEl={anchorEl}
+        open={open}
+        onClose={() => setAnchorEl(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+        slotProps={{ paper: { sx: { minWidth: 256, mt: 1.5 } } }}
+      >
+        <Box sx={{ px: 2, py: 1.5, borderBottom: 1, borderColor: 'divider' }}>
+          <Typography fontWeight={500}>Display Fields</Typography>
+          <Typography variant="body2" color="text.secondary">
+            Choose which columns to show
+          </Typography>
+        </Box>
+        <Box sx={{ maxHeight: 320, overflow: 'auto' }}>
+          {fields.map((field) => (
+            <MenuItem
+              key={field.key}
+              onClick={() => toggleField(field.key)}
+              sx={{ py: 1 }}
+            >
+              <Checkbox
+                checked={field.enabled}
+                size="small"
+                sx={{ mr: 1.5, pointerEvents: 'none' }}
+              />
+              <Typography variant="body2">{field.label}</Typography>
+            </MenuItem>
+          ))}
+        </Box>
+      </Menu>
+    </Box>
   );
 }

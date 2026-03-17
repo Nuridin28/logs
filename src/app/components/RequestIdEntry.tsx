@@ -1,14 +1,18 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router';
-import { Search, ArrowRight, Network, Moon, Sun } from 'lucide-react';
-import { useTheme } from '../hooks/useTheme';
+import { Search, ArrowForward, DarkMode, LightMode } from '@mui/icons-material';
+import { Network } from 'lucide-react';
+import { Box, Typography, TextField, Button, IconButton, useTheme } from '@mui/material';
+import { useTheme as useAppTheme } from '../ThemeProvider';
 
 export default function RequestIdEntry() {
   const [requestId, setRequestId] = useState('');
   const navigate = useNavigate();
-  const { theme, toggleTheme } = useTheme();
+  const { mode, toggleTheme } = useAppTheme();
+  const muiTheme = useTheme();
+  const isDark = muiTheme.palette.mode === 'dark';
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (requestId.trim()) {
       navigate(`/${requestId.trim()}`);
@@ -16,86 +20,152 @@ export default function RequestIdEntry() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors">
-      {/* Theme Toggle */}
-      <div className="fixed top-4 right-4 z-50">
-        <button
-          onClick={toggleTheme}
-          className="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-          aria-label="Toggle theme"
-        >
-          {theme === 'light' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
-        </button>
-      </div>
+    <Box
+      sx={{
+        minHeight: '100vh',
+        bgcolor: 'background.default',
+        position: 'relative',
+      }}
+    >
+      <IconButton
+        onClick={toggleTheme}
+        sx={{
+          position: 'fixed',
+          top: 16,
+          right: 16,
+          zIndex: 50,
+          bgcolor: 'background.paper',
+          border: 1,
+          borderColor: 'divider',
+          '&:hover': { bgcolor: isDark ? 'grey.800' : 'grey.100' },
+        }}
+        aria-label="Toggle theme"
+      >
+        {mode === 'light' ? <DarkMode /> : <LightMode />}
+      </IconButton>
 
-      <div className="min-h-screen flex items-center justify-center px-4 py-8">
-        <div className="w-full max-w-md mx-auto">
-          {/* Icon and Title */}
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 dark:bg-blue-900/30 rounded-2xl mb-4">
-              <Network className="w-8 h-8 text-blue-600 dark:text-blue-400" />
-            </div>
-            <h2 className="text-2xl sm:text-3xl font-semibold text-slate-900 dark:text-white mb-2">
+      <Box
+        sx={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          px: 2,
+          py: 4,
+        }}
+      >
+        <Box sx={{ width: '100%', maxWidth: 448, mx: 'auto' }}>
+          <Box sx={{ textAlign: 'center', mb: 4 }}>
+            <Box
+              sx={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 64,
+                height: 64,
+                bgcolor: isDark ? 'grey.800' : 'grey.100',
+                borderRadius: 2,
+                mb: 2,
+              }}
+            >
+              <Box sx={{ color: 'primary.main' }}>
+                <Network size={32} />
+              </Box>
+            </Box>
+            <Typography variant="h4" fontWeight={600} sx={{ mb: 1 }}>
               Request Flow Visualization
-            </h2>
-            <p className="text-slate-600 dark:text-slate-400">
+            </Typography>
+            <Typography color="text.secondary">
               Enter a request ID to view the complete flow path
-            </p>
-          </div>
+            </Typography>
+          </Box>
 
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
-            <div className="mb-6">
-              <label 
-                htmlFor="requestId" 
-                className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2"
-              >
+          <Box
+            component="form"
+            onSubmit={handleSubmit}
+            sx={{
+              bgcolor: 'background.paper',
+              borderRadius: 2,
+              border: 1,
+              borderColor: 'divider',
+              p: 3,
+              boxShadow: 1,
+            }}
+          >
+            <Box sx={{ mb: 3 }}>
+              <Typography component="label" variant="body2" fontWeight={500} sx={{ display: 'block', mb: 1 }}>
                 Request ID
-              </label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 dark:text-slate-500" />
-                <input
-                  id="requestId"
-                  type="text"
-                  value={requestId}
-                  onChange={(e) => setRequestId(e.target.value)}
-                  placeholder="e.g., req-001, req-003..."
-                  className="w-full pl-10 pr-4 py-3 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600 focus:border-transparent transition-colors"
-                  autoFocus
+              </Typography>
+              <Box sx={{ position: 'relative' }}>
+                <Search
+                  sx={{
+                    position: 'absolute',
+                    left: 14,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    color: 'text.disabled',
+                    fontSize: 20,
+                    pointerEvents: 'none',
+                  }}
                 />
-              </div>
-              <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+              <TextField
+                id="requestId"
+                fullWidth
+                value={requestId}
+                onChange={(e) => setRequestId(e.target.value)}
+                placeholder="e.g., req-001, req-003..."
+                autoFocus
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    bgcolor: 'background.default',
+                  },
+                  '& .MuiOutlinedInput-input': {
+                    pl: 5,
+                  },
+                }}
+              />
+              </Box>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
                 Enter the unique identifier for the request you want to trace
-              </p>
-            </div>
+              </Typography>
+            </Box>
 
-            <button
+            <Button
               type="submit"
+              variant="contained"
+              fullWidth
               disabled={!requestId.trim()}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
+              endIcon={<ArrowForward />}
+              sx={{ py: 1.5 }}
             >
               View Request Flow
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </form>
+            </Button>
+          </Box>
 
-          {/* Example IDs */}
-          <div className="mt-6 text-center">
-            <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">Try these examples:</p>
-            <div className="flex flex-wrap gap-2 justify-center">
-              {['req-001', 'req-003', 'req-005'].map(id => (
-                <button
+          <Box sx={{ mt: 3, textAlign: 'center' }}>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              Try these examples:
+            </Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, justifyContent: 'center' }}>
+              {['req-001', 'req-003', 'req-005'].map((id) => (
+                <Button
                   key={id}
+                  variant="outlined"
+                  size="small"
                   onClick={() => setRequestId(id)}
-                  className="px-3 py-1.5 text-xs font-mono bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-md border border-slate-200 dark:border-slate-700 transition-colors"
+                  sx={{
+                    fontFamily: 'monospace',
+                    fontSize: 12,
+                    textTransform: 'none',
+                  }}
                 >
                   {id}
-                </button>
+                </Button>
               ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+            </Box>
+          </Box>
+        </Box>
+      </Box>
+    </Box>
   );
 }

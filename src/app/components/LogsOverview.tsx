@@ -1,17 +1,25 @@
-import { useState, useMemo } from 'react';
-import { Link, useParams } from 'react-router';
-import { 
-  ArrowUpDown, 
-  AlertCircle, 
-  AlertTriangle, 
-  Info, 
-  CheckCircle, 
-  Bug,
-  Eye
-} from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { useParams } from 'react-router';
+import { SwapVert, Info as InfoIcon, Visibility } from '@mui/icons-material';
+import {
+  Box,
+  Typography,
+  Button,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  useTheme,
+  useMediaQuery,
+} from '@mui/material';
 import { mockLogs, logFields as initialFields, Log, LogLevel } from '../utils/mockLogs';
+import { formatTimestamp } from '../utils/format';
 import FieldSelector from './FieldSelector';
 import Pagination from './Pagination';
+import ViewLogButton from './ViewLogButton';
+import { LevelChip, PageHeader, Card, EmptyState } from './ui';
 
 type SortField = 'timestamp' | 'container' | 'service' | 'level';
 type SortDirection = 'asc' | 'desc';
@@ -20,23 +28,22 @@ export default function LogsOverview() {
   const { requestId } = useParams<{ requestId: string }>();
   const [sortField, setSortField] = useState<SortField>('timestamp');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
-  const [fields, setFields] = useState(initialFields.map(f => ({ ...f })));
+  const [fields, setFields] = useState(initialFields.map((f) => ({ ...f })));
   const [selectedLevel, setSelectedLevel] = useState<LogLevel | 'all'>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const isDark = theme.palette.mode === 'dark';
 
   const sortedLogs = useMemo(() => {
-    // First filter by requestId
-    let filtered = mockLogs.filter(log => log.requestId === requestId);
-    
+    let filtered = mockLogs.filter((log) => log.requestId === requestId);
     if (selectedLevel !== 'all') {
-      filtered = filtered.filter(log => log.level === selectedLevel);
+      filtered = filtered.filter((log) => log.level === selectedLevel);
     }
-
     return filtered.sort((a, b) => {
-      let aVal: any = a[sortField];
-      let bVal: any = b[sortField];
-
+      let aVal: string | number = a[sortField] as string;
+      let bVal: string | number = b[sortField] as string;
       if (sortField === 'timestamp') {
         aVal = new Date(aVal).getTime();
         bVal = new Date(bVal).getTime();
@@ -44,7 +51,6 @@ export default function LogsOverview() {
         aVal = String(aVal).toLowerCase();
         bVal = String(bVal).toLowerCase();
       }
-
       if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
       if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
       return 0;
@@ -53,14 +59,13 @@ export default function LogsOverview() {
 
   const totalPages = Math.ceil(sortedLogs.length / itemsPerPage);
   const paginatedLogs = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    return sortedLogs.slice(startIndex, endIndex);
+    const start = (currentPage - 1) * itemsPerPage;
+    return sortedLogs.slice(start, start + itemsPerPage);
   }, [sortedLogs, currentPage, itemsPerPage]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+      setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'));
     } else {
       setSortField(field);
       setSortDirection('asc');
@@ -74,225 +79,162 @@ export default function LogsOverview() {
 
   const handleItemsPerPageChange = (newItemsPerPage: number) => {
     setItemsPerPage(newItemsPerPage);
-    setCurrentPage(1); // Reset to first page when items per page changes
+    setCurrentPage(1);
   };
 
-  const getLevelIcon = (level: LogLevel) => {
-    switch (level) {
-      case 'error':
-        return <AlertCircle className="w-4 h-4" />;
-      case 'warn':
-        return <AlertTriangle className="w-4 h-4" />;
-      case 'info':
-        return <Info className="w-4 h-4" />;
-      case 'success':
-        return <CheckCircle className="w-4 h-4" />;
-      case 'debug':
-        return <Bug className="w-4 h-4" />;
-    }
-  };
-
-  const getLevelColor = (level: LogLevel) => {
-    switch (level) {
-      case 'error':
-        return 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800';
-      case 'warn':
-        return 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800';
-      case 'info':
-        return 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800';
-      case 'success':
-        return 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800';
-      case 'debug':
-        return 'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800';
-    }
-  };
-
-  const formatTimestamp = (timestamp: string) => {
-    const date = new Date(timestamp);
-    return date.toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false
-    });
-  };
-
-  const enabledFields = fields.filter(f => f.enabled);
+  const enabledFields = fields.filter((f) => f.enabled);
 
   return (
-    <div className="max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="mb-4 sm:mb-6">
-        <h2 className="text-2xl sm:text-3xl font-semibold text-slate-900 dark:text-white mb-2">Logs Overview</h2>
-        <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400">Monitor and analyze system logs in real-time</p>
-      </div>
+    <Box sx={{ maxWidth: 1280, mx: 'auto' }}>
+      <PageHeader
+        title="Logs Overview"
+        subtitle="Monitor and analyze system logs in real-time"
+      />
 
-      {/* Controls */}
-      <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-3 sm:p-4 mb-4 sm:mb-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Filter by level:</span>
-            <div className="flex flex-wrap gap-2">
-              {(['all', 'error', 'warn', 'info', 'success', 'debug'] as const).map(level => (
-                <button
+      <Card sx={{ p: { xs: 1.5, sm: 2 }, mb: { xs: 2, sm: 3 } }}>
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: { xs: 'column', sm: 'row' },
+            alignItems: { xs: 'flex-start', sm: 'center' },
+            justifyContent: 'space-between',
+            gap: 1.5,
+          }}
+        >
+          <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: { xs: 'flex-start', sm: 'center' }, gap: 1 }}>
+            <Typography variant="body2" fontWeight={500} color="text.secondary">
+              Filter by level:
+            </Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+              {(['all', 'error', 'warn', 'info', 'success', 'debug'] as const).map((level) => (
+                <Button
                   key={level}
+                  size="small"
+                  variant={selectedLevel === level ? 'contained' : 'outlined'}
                   onClick={() => setSelectedLevel(level)}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                    selectedLevel === level
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
-                  }`}
+                  sx={{ textTransform: 'capitalize' }}
                 >
                   {level.charAt(0).toUpperCase() + level.slice(1)}
-                </button>
+                </Button>
               ))}
-            </div>
-          </div>
-          
+            </Box>
+          </Box>
           <FieldSelector fields={fields} onFieldsChange={setFields} />
-        </div>
-      </div>
+        </Box>
+      </Card>
 
-      {/* Logs Table - Desktop */}
-      <div className="hidden md:block bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700">
-              <tr>
-                {enabledFields.map(field => (
-                  <th
-                    key={field.key}
-                    className="px-4 py-3 text-left"
-                  >
-                    <button
-                      onClick={() => handleSort(field.key as SortField)}
-                      className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
-                    >
-                      {field.label}
-                      <ArrowUpDown className="w-4 h-4" />
-                    </button>
-                  </th>
-                ))}
-                <th className="px-4 py-3 text-left">
-                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Actions</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-              {paginatedLogs.map((log) => (
-                <tr
-                  key={log.id}
-                  className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
-                >
-                  {enabledFields.map(field => (
-                    <td key={field.key} className="px-4 py-3">
-                      {field.key === 'timestamp' && (
-                        <span className="text-sm text-slate-600 dark:text-slate-400">
-                          {formatTimestamp(log.timestamp)}
-                        </span>
-                      )}
-                      {field.key === 'level' && (
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border ${getLevelColor(log.level)}`}>
-                          {getLevelIcon(log.level)}
-                          {log.level.toUpperCase()}
-                        </span>
-                      )}
-                      {field.key === 'container' && (
-                        <span className="text-sm font-mono text-slate-700 dark:text-slate-300">
-                          {log.container}
-                        </span>
-                      )}
-                      {field.key === 'service' && (
-                        <span className="text-sm text-slate-700 dark:text-slate-300">
-                          {log.service}
-                        </span>
-                      )}
-                      {field.key === 'message' && (
-                        <span className="text-sm text-slate-900 dark:text-white">
-                          {log.message}
-                        </span>
-                      )}
-                      {field.key === 'host' && (
-                        <span className="text-sm font-mono text-slate-600 dark:text-slate-400">
-                          {log.host}
-                        </span>
-                      )}
-                    </td>
+      {!isMobile && (
+        <TableContainer
+          component={Box}
+          sx={{ overflow: 'hidden' }}
+        >
+          <Card>
+            <Table>
+              <TableHead>
+                <TableRow sx={{ bgcolor: isDark ? 'grey.800' : 'grey.100' }}>
+                  {enabledFields.map((field) => (
+                    <TableCell key={field.key}>
+                      <Button
+                        size="small"
+                        onClick={() => handleSort(field.key as SortField)}
+                        startIcon={<SwapVert />}
+                        sx={{ color: 'text.secondary', textTransform: 'none' }}
+                      >
+                        {field.label}
+                      </Button>
+                    </TableCell>
                   ))}
-                  <td className="px-4 py-3">
-                    <Link
-                      to={`/${requestId}/log/${log.id}`}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
-                    >
-                      <Eye className="w-4 h-4" />
-                      View
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Logs Cards - Mobile */}
-      <div className="md:hidden space-y-3">
-        {paginatedLogs.map((log) => (
-          <div key={log.id} className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-4">
-            <div className="flex items-start justify-between gap-2 mb-3">
-              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border ${getLevelColor(log.level)}`}>
-                {getLevelIcon(log.level)}
-                {log.level.toUpperCase()}
-              </span>
-              <span className="text-xs text-slate-500 dark:text-slate-400">
-                {formatTimestamp(log.timestamp)}
-              </span>
-            </div>
-            
-            <h3 className="font-medium text-slate-900 dark:text-white mb-2 line-clamp-2">{log.message}</h3>
-            
-            <div className="space-y-1.5 mb-3 text-sm">
-              {enabledFields.map(field => {
-                if (field.key === 'timestamp' || field.key === 'level' || field.key === 'message') return null;
-                
-                return (
-                  <div key={field.key} className="flex items-center justify-between gap-2">
-                    <span className="text-slate-600 dark:text-slate-400 text-xs">{field.label}:</span>
-                    {field.key === 'container' && (
-                      <span className="font-mono text-slate-900 dark:text-white text-xs break-all">{log.container}</span>
-                    )}
-                    {field.key === 'service' && (
-                      <span className="text-slate-900 dark:text-white text-xs">{log.service}</span>
-                    )}
-                    {field.key === 'host' && (
-                      <span className="font-mono text-slate-700 dark:text-slate-300 text-xs break-all">{log.host}</span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-            
-            <Link
-              to={`/${requestId}/log/${log.id}`}
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors w-full justify-center"
-            >
-              <Eye className="w-4 h-4" />
-              View Details
-            </Link>
-          </div>
-        ))}
-      </div>
-
-      {paginatedLogs.length === 0 && (
-        <div className="text-center py-12 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
-          <Info className="w-12 h-12 text-slate-400 dark:text-slate-600 mx-auto mb-3" />
-          <p className="text-slate-600 dark:text-slate-400">No logs found matching your filters</p>
-        </div>
+                  <TableCell>
+                    <Typography variant="body2" fontWeight={500} color="text.secondary">
+                      Actions
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {paginatedLogs.map((log) => (
+                  <TableRow key={log.id} hover>
+                    {enabledFields.map((field) => (
+                      <TableCell key={field.key}>
+                        {field.key === 'timestamp' && (
+                          <Typography variant="body2" color="text.secondary">
+                            {formatTimestamp(log.timestamp)}
+                          </Typography>
+                        )}
+                        {field.key === 'level' && <LevelChip level={log.level} />}
+                        {field.key === 'container' && (
+                          <Typography variant="body2" fontFamily="monospace">
+                            {log.container}
+                          </Typography>
+                        )}
+                        {field.key === 'service' && (
+                          <Typography variant="body2">{log.service}</Typography>
+                        )}
+                        {field.key === 'message' && (
+                          <Typography variant="body2">{log.message}</Typography>
+                        )}
+                        {field.key === 'host' && (
+                          <Typography variant="body2" fontFamily="monospace" color="text.secondary">
+                            {log.host}
+                          </Typography>
+                        )}
+                      </TableCell>
+                    ))}
+                    <TableCell>
+                      <ViewLogButton logId={log.id} />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
+        </TableContainer>
       )}
 
-      {/* Pagination */}
+      {isMobile && (
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+          {paginatedLogs.map((log) => (
+            <Card key={log.id} sx={{ p: 2 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.5 }}>
+                <LevelChip level={log.level} />
+                <Typography variant="caption" color="text.secondary">
+                  {formatTimestamp(log.timestamp)}
+                </Typography>
+              </Box>
+              <Typography fontWeight={500} sx={{ mb: 1.5, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                {log.message}
+              </Typography>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75, mb: 1.5 }}>
+                {enabledFields
+                  .filter((f) => !['timestamp', 'level', 'message'].includes(f.key))
+                  .map((field) => (
+                    <Box key={field.key} sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}>
+                      <Typography variant="caption" color="text.secondary">
+                        {field.label}:
+                      </Typography>
+                      <Typography variant="caption" fontFamily={field.key === 'container' || field.key === 'host' ? 'monospace' : undefined}>
+                        {log[field.key as keyof Log] as string}
+                      </Typography>
+                    </Box>
+                  ))}
+              </Box>
+              <ViewLogButton logId={log.id} fullWidth>
+                View Details
+              </ViewLogButton>
+            </Card>
+          ))}
+        </Box>
+      )}
+
+      {paginatedLogs.length === 0 && (
+        <EmptyState
+          icon={InfoIcon}
+          title="No logs found"
+          description="No logs found matching your filters"
+          iconSize={48}
+        />
+      )}
+
       <Pagination
         currentPage={currentPage}
         totalPages={totalPages}
@@ -301,6 +243,6 @@ export default function LogsOverview() {
         itemsPerPage={itemsPerPage}
         totalItems={sortedLogs.length}
       />
-    </div>
+    </Box>
   );
 }

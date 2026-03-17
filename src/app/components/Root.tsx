@@ -1,117 +1,171 @@
 import { Outlet, Link, useLocation, useParams, useNavigate } from 'react-router';
-import { Activity, LayoutDashboard, Network, Menu, X, Moon, Sun, ArrowLeft } from 'lucide-react';
-import { useState } from 'react';
-import { useTheme } from '../hooks/useTheme';
+import {
+  Assessment,
+  Dashboard,
+  AccountTree,
+  Menu as MenuIcon,
+  Close,
+  DarkMode,
+  LightMode,
+  ArrowBack,
+} from '@mui/icons-material';
+import React, { useState } from 'react';
+import {
+  Box,
+  AppBar,
+  Toolbar,
+  Typography,
+  Button,
+  IconButton,
+  useTheme,
+  useMediaQuery,
+} from '@mui/material';
+import { useTheme as useAppTheme } from '../ThemeProvider';
+
+const navItems = [
+  { pathKey: 'index', label: 'Logs Overview', icon: Dashboard },
+  { pathKey: 'request-flow', label: 'Request Flow', icon: AccountTree },
+];
 
 export default function Root() {
   const location = useLocation();
   const { requestId } = useParams<{ requestId: string }>();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { theme, toggleTheme } = useTheme();
-  
-  const navItems = [
-    { path: `/${requestId}`, label: 'Logs Overview', icon: LayoutDashboard },
-    { path: `/${requestId}/request-flow`, label: 'Request Flow', icon: Network },
-  ];
+  const { mode, toggleTheme } = useAppTheme();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+
+  const isActive = (pathKey: string) => {
+    if (pathKey === 'index') return location.pathname === `/${requestId}`;
+    return location.pathname === `/${requestId}/${pathKey}`;
+  };
+
+  const getPath = (pathKey: string) =>
+    pathKey === 'index' ? `/${requestId}` : `/${requestId}/${pathKey}`;
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors">
-      {/* Header */}
-      <header className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 sticky top-0 z-50 transition-colors">
-        <div className="px-4 sm:px-6 py-3 sm:py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <Activity className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600 dark:text-blue-400" />
-              <div>
-                <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 dark:text-white">LogView</h1>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-xs text-slate-600 dark:text-slate-400">Request:</span>
-                  <span className="text-xs font-mono bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 px-2 py-0.5 rounded">{requestId}</span>
-                </div>
-              </div>
-            </div>
-            
-            {/* Desktop Navigation */}
-            <div className="hidden md:flex items-center gap-2">
-              <button
+    <Box
+      sx={{
+        minHeight: '100vh',
+        bgcolor: 'background.default',
+        transition: 'background-color 0.2s',
+      }}
+    >
+      <AppBar
+        position="sticky"
+        elevation={0}
+        sx={{
+          bgcolor: 'background.paper',
+          color: 'text.primary',
+          borderBottom: 1,
+          borderColor: 'divider',
+        }}
+      >
+        <Toolbar sx={{ px: { xs: 2, sm: 3 }, py: { xs: 1.5, sm: 2 } }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 1, sm: 1.5 }, flex: 1 }}>
+            <Assessment sx={{ color: 'primary.main', fontSize: { xs: 28, sm: 32 } }} />
+            <Box>
+              <Typography variant="h6" component="h1" fontWeight={600}>
+                LogView
+              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.25 }}>
+                <Typography variant="caption" color="text.secondary">
+                  Request:
+                </Typography>
+                <Typography
+                  variant="caption"
+                  component="span"
+                  sx={{
+                    fontFamily: 'monospace',
+                    bgcolor: 'primary.main',
+                    color: 'white',
+                    px: 1,
+                    py: 0.25,
+                    borderRadius: 1,
+                    opacity: 0.9,
+                  }}
+                >
+                  {requestId}
+                </Typography>
+              </Box>
+            </Box>
+          </Box>
+
+          {!isMobile && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Button
+                startIcon={<ArrowBack />}
                 onClick={() => navigate('/')}
-                className="flex items-center gap-2 px-3 py-2 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                sx={(theme) => ({ color: 'text.secondary', '&:hover': { bgcolor: theme.palette.mode === 'dark' ? 'grey.800' : 'grey.100' } })}
               >
-                <ArrowLeft className="w-4 h-4" />
                 Change Request ID
-              </button>
-              
-              {navItems.map(item => (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-                    location.pathname === item.path
-                      ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300'
-                      : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
-                  }`}
-                >
-                  <item.icon className="w-4 h-4" />
-                  <span>{item.label}</span>
-                </Link>
-              ))}
-              
-              {/* Theme Toggle */}
-              <button
-                onClick={toggleTheme}
-                className="p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-                aria-label="Toggle theme"
-              >
-                {theme === 'light' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
-              </button>
-            </div>
+              </Button>
 
-            {/* Mobile Menu Button */}
-            <div className="md:hidden flex items-center gap-2">
-              <button
-                onClick={toggleTheme}
-                className="p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg"
-                aria-label="Toggle theme"
-              >
-                {theme === 'light' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
-              </button>
-              <button
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg"
-              >
-                {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-              </button>
-            </div>
-          </div>
-
-          {/* Mobile Navigation */}
-          {mobileMenuOpen && (
-            <nav className="md:hidden mt-4 pb-2 space-y-1">
-              {navItems.map(item => (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-2 px-4 py-3 rounded-lg transition-colors ${
-                    location.pathname === item.path
-                      ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300'
-                      : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
-                  }`}
+              {navItems.map((item) => (
+                <Button
+                  key={item.pathKey}
+                  component={Link}
+                  to={getPath(item.pathKey)}
+                  startIcon={<item.icon />}
+                sx={(theme) => ({
+                  color: isActive(item.pathKey) ? 'primary.main' : 'text.secondary',
+                  bgcolor: isActive(item.pathKey) ? (theme.palette.mode === 'dark' ? 'grey.800' : 'grey.100') : 'transparent',
+                  '&:hover': { bgcolor: theme.palette.mode === 'dark' ? 'grey.800' : 'grey.100' },
+                })}
                 >
-                  <item.icon className="w-5 h-5" />
-                  <span>{item.label}</span>
-                </Link>
+                  {item.label}
+                </Button>
               ))}
-            </nav>
+
+              <IconButton onClick={toggleTheme} sx={{ color: 'text.secondary' }} aria-label="Toggle theme">
+                {mode === 'light' ? <DarkMode /> : <LightMode />}
+              </IconButton>
+            </Box>
           )}
-        </div>
-      </header>
 
-      {/* Main Content */}
-      <main className="px-4 sm:px-6 py-4 sm:py-6">
+          {isMobile && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <IconButton onClick={toggleTheme} sx={{ color: 'text.secondary' }} aria-label="Toggle theme">
+                {mode === 'light' ? <DarkMode /> : <LightMode />}
+              </IconButton>
+              <IconButton
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                sx={{ color: 'text.secondary' }}
+              >
+                {mobileMenuOpen ? <Close /> : <MenuIcon />}
+              </IconButton>
+            </Box>
+          )}
+        </Toolbar>
+
+        {isMobile && mobileMenuOpen && (
+          <Box sx={{ px: 2, pb: 2, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+            {navItems.map((item) => (
+              <Button
+                key={item.pathKey}
+                component={Link}
+                to={getPath(item.pathKey)}
+                startIcon={<item.icon />}
+                onClick={() => setMobileMenuOpen(false)}
+                fullWidth
+                sx={(theme) => ({
+                  justifyContent: 'flex-start',
+                  color: isActive(item.pathKey) ? 'primary.main' : 'text.secondary',
+                  bgcolor: isActive(item.pathKey) ? (theme.palette.mode === 'dark' ? 'grey.800' : 'grey.100') : 'transparent',
+                  '&:hover': { bgcolor: theme.palette.mode === 'dark' ? 'grey.800' : 'grey.100' },
+                })}
+              >
+                {item.label}
+              </Button>
+            ))}
+          </Box>
+        )}
+      </AppBar>
+
+      <Box component="main" sx={{ px: { xs: 2, sm: 3 }, py: { xs: 2, sm: 3 } }}>
         <Outlet />
-      </main>
-    </div>
+      </Box>
+    </Box>
   );
 }

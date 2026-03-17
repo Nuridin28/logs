@@ -2,7 +2,7 @@ import { createBrowserRouter } from 'react-router';
 import Root from './components/Root';
 import LogsOverview from './components/LogsOverview';
 import LogDetail from './components/LogDetail';
-import RequestFlow from './components/RequestFlow';
+import RequestFlowRoute from './components/RequestFlowRoute';
 import RequestIdEntry from './components/RequestIdEntry';
 
 export const router = createBrowserRouter([
@@ -24,7 +24,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'request-flow',
-        Component: RequestFlow,
+        Component: RequestFlowRoute,
       },
     ],
   },
