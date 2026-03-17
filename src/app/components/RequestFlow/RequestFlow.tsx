@@ -195,9 +195,9 @@ export default function RequestFlow({ requestId, logs, onViewLog }: RequestFlowP
             {seqEvents.map((ev) => {
               const isExp = expanded[ev.id] ?? false;
               const activeCol = ev.isResponse ? ev.fromCol : ev.toCol;
-              const matchLog = ev.isResponse
-                ? requestLogs.find((l) => services[ev.fromCol] === l.service)
-                : requestLogs.find((l) => services[ev.toCol] === l.service);
+              const serviceName = ev.isResponse ? services[ev.fromCol] : services[ev.toCol];
+              const matchLog = requestLogs.find((l) => l.service === serviceName)
+                ?? primaryLog;
 
               return (
                 <React.Fragment key={ev.id}>
