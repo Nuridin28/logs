@@ -47,7 +47,6 @@ export interface Log {
   message: string;
   host: string;
   requestId?: string;
-  requestFlow?: RequestFlow;
 }
 
 // ─── Sequence diagram ────────────────────────────────────────────────────────

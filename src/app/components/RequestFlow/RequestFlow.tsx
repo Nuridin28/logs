@@ -4,7 +4,7 @@ import { Error as ErrorIcon, ArrowForward, ArrowBack } from '@mui/icons-material
 
 import type { NodeType, Status, RequestFlowProps } from './types';
 import { COL_W, TS_W, ROW_H } from './constants';
-import { getColor, buildSequence } from './helpers';
+import { getColor, buildSequence, buildGraphFromLogs } from './helpers';
 
 import Card from './ui/Card';
 import EmptyState from './ui/EmptyState';
@@ -27,14 +27,10 @@ export default function RequestFlow({ requestId, logs, onViewLog }: RequestFlowP
     [logs, requestId],
   );
 
-  const primaryLog = useMemo(
-    () => requestLogs.find((l) => l.requestFlow && l.requestFlow.edges.length > 0),
-    [requestLogs],
-  );
+  const flow = useMemo(() => buildGraphFromLogs(requestLogs), [requestLogs]);
 
-  const flow = primaryLog?.requestFlow;
-  const nodes = flow?.nodes ?? [];
-  const edges = flow?.edges ?? [];
+  const nodes = flow.nodes;
+  const edges = flow.edges;
 
   const services = useMemo(() => {
     const seen = new Set<string>();
@@ -198,8 +194,16 @@ export default function RequestFlow({ requestId, logs, onViewLog }: RequestFlowP
               const isExp = expanded[ev.id] ?? false;
               const activeCol = ev.isResponse ? ev.fromCol : ev.toCol;
               const serviceName = ev.isResponse ? services[ev.fromCol] : services[ev.toCol];
-              const matchLog = requestLogs.find((l) => l.service === serviceName)
-                ?? primaryLog;
+              // Request → первый лог сервиса (что получил), Response → последний (что ответил)
+              let matchLog: typeof requestLogs[number] | undefined;
+              if (ev.isResponse) {
+                for (let i = requestLogs.length - 1; i >= 0; i--) {
+                  if (requestLogs[i].service === serviceName) { matchLog = requestLogs[i]; break; }
+                }
+              } else {
+                matchLog = requestLogs.find((l) => l.service === serviceName);
+              }
+              matchLog = matchLog ?? requestLogs[0];
 
               return (
                 <React.Fragment key={ev.id}>
