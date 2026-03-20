@@ -1,91 +1,92 @@
 import type { Log } from '../components/RequestFlow';
+import { parseRawLogText } from './parseRawLogs';
 
 export type { Log, FlowNode, FlowEdge, LogLevel } from '../components/RequestFlow';
+const RAW_LOGS = `
+logging-fluentd-2hwf7
 
-/**
- * Mock logs — чистые логи с разных микросервисов.
- * Граф строится автоматически из порядка timestamps через buildGraphFromLogs().
- */
-export const mockLogs: Log[] = [
-  // ═══ req-001: Payment flow (linear A→B→C→D, error at D) ═══════════════════
-  { id: '1',  timestamp: '2026-03-02T10:15:22.000Z', container: 'mobile-app',        service: 'Mobile App',         level: 'info',    message: 'User initiated payment POST /api/payments',       host: 'client-device',          requestId: 'req-001' },
-  { id: '2',  timestamp: '2026-03-02T10:15:22.050Z', container: 'api-gateway-01',     service: 'API Gateway',        level: 'info',    message: 'Received POST /api/payments, forwarding',         host: 'srv-prod-01.us-east',    requestId: 'req-001' },
-  { id: '3',  timestamp: '2026-03-02T10:15:22.200Z', container: 'payment-service-01', service: 'Payment Service',    level: 'info',    message: 'Processing payment for order #12345',             host: 'srv-prod-06.us-east',    requestId: 'req-001' },
-  { id: '4',  timestamp: '2026-03-02T10:15:22.400Z', container: 'payment-proc-01',    service: 'Payment Processor',  level: 'error',   message: 'Connection timeout — external API unreachable',   host: 'srv-external-01.us-east', requestId: 'req-001' },
-  { id: '5',  timestamp: '2026-03-02T10:15:22.600Z', container: 'payment-service-01', service: 'Payment Service',    level: 'error',   message: 'Payment retry failed after 3 attempts',           host: 'srv-prod-06.us-east',    requestId: 'req-001' },
-  { id: '6',  timestamp: '2026-03-02T10:15:22.700Z', container: 'api-gateway-01',     service: 'API Gateway',        level: 'error',   message: '502 Bad Gateway returned to client',              host: 'srv-prod-01.us-east',    requestId: 'req-001' },
-  { id: '7',  timestamp: '2026-03-02T10:15:22.800Z', container: 'mobile-app',         service: 'Mobile App',         level: 'error',   message: 'Payment failed — showing error to user',          host: 'client-device',          requestId: 'req-001' },
+[2026-03-18 05:00:55.363] [INFO] [request_id=5e355c48-868a-42c6-9cc9-25500a8e1de8] [thread=http-nio-8080-exec-6] [class=com.du.bff.common.logging.LogService] [method=logIncomingRequest] [pod=du-bff] - Incoming request: [POST] /graphql | Started At: 2026-03-18T05:00:55.362Z | Operation: query searchAddress
 
-  // ═══ req-002: Auth flow (B calls DB, then B calls Redis — re-request) ═════
-  { id: '8',  timestamp: '2026-03-02T10:14:18.000Z', container: 'web-browser',        service: 'Web Browser',        level: 'info',    message: 'POST /api/auth/login',                            host: 'client-browser',         requestId: 'req-002' },
-  { id: '9',  timestamp: '2026-03-02T10:14:18.050Z', container: 'load-balancer-01',   service: 'Load Balancer',      level: 'info',    message: 'Forwarding to auth service',                      host: 'lb-prod-01.us-east',     requestId: 'req-002' },
-  { id: '10', timestamp: '2026-03-02T10:14:18.100Z', container: 'auth-service-02',    service: 'Auth Service',       level: 'info',    message: 'Processing authentication request',                host: 'srv-prod-02.us-east',    requestId: 'req-002' },
-  { id: '11', timestamp: '2026-03-02T10:14:18.200Z', container: 'user-db-01',         service: 'User Database',      level: 'info',    message: 'Looking up user credentials',                     host: 'db-prod-01.us-east',     requestId: 'req-002' },
-  { id: '12', timestamp: '2026-03-02T10:14:18.550Z', container: 'auth-service-02',    service: 'Auth Service',       level: 'info',    message: 'Credentials verified, creating session',          host: 'srv-prod-02.us-east',    requestId: 'req-002' },
-  { id: '13', timestamp: '2026-03-02T10:14:18.600Z', container: 'redis-cache-01',     service: 'Redis Cache',        level: 'info',    message: 'Storing session token TTL=3600s',                 host: 'cache-prod-01.us-east',  requestId: 'req-002' },
-  { id: '14', timestamp: '2026-03-02T10:14:18.650Z', container: 'auth-service-02',    service: 'Auth Service',       level: 'success', message: 'Session created successfully',                     host: 'srv-prod-02.us-east',    requestId: 'req-002' },
-  { id: '15', timestamp: '2026-03-02T10:14:18.700Z', container: 'load-balancer-01',   service: 'Load Balancer',      level: 'success', message: 'Auth complete, returning 200',                     host: 'lb-prod-01.us-east',     requestId: 'req-002' },
-  { id: '16', timestamp: '2026-03-02T10:14:18.750Z', container: 'web-browser',        service: 'Web Browser',        level: 'success', message: 'Login successful — redirecting to dashboard',      host: 'client-browser',         requestId: 'req-002' },
+[2026-03-18 05:00:55.410] [DEBUG] [request_id=5e355c48-868a-42c6-9cc9-25500a8e1de8] [thread=http-nio-8080-exec-6] [class=com.du.bff.common.logging.LogService] [method=logIncomingRequest] [pod=du-bff] - Incoming request details | Headers: X-Device-ID-Type:"UUID", X-Device-ID:"4f7e669a-02d9-4cf6-bd90-5f37f6e31536", X-Correlation-ID:"54ea048f-23ca-48db-a47b-ba225e27c71b", Content-Type:"application/json; charset=utf-8" | Variables: {gaid=DXB_E3279L_13610_005404040}
 
-  // ═══ req-003: Slow query (simple linear) ══════════════════════════════════
-  { id: '17', timestamp: '2026-03-02T10:13:40.000Z', container: 'admin-dashboard',    service: 'Admin Dashboard',    level: 'info',    message: 'GET /api/users/report',                           host: 'client-admin',           requestId: 'req-003' },
-  { id: '18', timestamp: '2026-03-02T10:13:40.050Z', container: 'api-gateway-02',     service: 'API Gateway',        level: 'info',    message: 'Routing to analytics service',                     host: 'srv-prod-01.us-east',    requestId: 'req-003' },
-  { id: '19', timestamp: '2026-03-02T10:13:40.100Z', container: 'analytics-svc-01',   service: 'Analytics Service',  level: 'info',    message: 'Generating user report',                           host: 'srv-prod-03.us-east',    requestId: 'req-003' },
-  { id: '20', timestamp: '2026-03-02T10:13:40.150Z', container: 'postgres-01',        service: 'PostgreSQL',         level: 'warn',    message: 'Slow query detected: 4973ms',                      host: 'db-prod-01.us-east',     requestId: 'req-003' },
-  { id: '21', timestamp: '2026-03-02T10:13:45.123Z', container: 'analytics-svc-01',   service: 'Analytics Service',  level: 'info',    message: 'Report generated, returning 42 rows',              host: 'srv-prod-03.us-east',    requestId: 'req-003' },
-  { id: '22', timestamp: '2026-03-02T10:13:45.173Z', container: 'api-gateway-02',     service: 'API Gateway',        level: 'info',    message: 'Response sent, 5073ms total',                      host: 'srv-prod-01.us-east',    requestId: 'req-003' },
-  { id: '23', timestamp: '2026-03-02T10:13:45.200Z', container: 'admin-dashboard',    service: 'Admin Dashboard',    level: 'success', message: 'Report loaded',                                    host: 'client-admin',           requestId: 'req-003' },
+[2026-03-18 05:00:55.567] [INFO] [request_id=5e355c48-868a-42c6-9cc9-25500a8e1de8] [thread=http-nio-8080-exec-6] [class=com.du.bff.common.logging.LogService] [method=logTokenExchange] [pod=du-bff] - Successful token exchange — tokenType=Bearer, expiresIn=3600
 
-  // ═══ req-004: Fan-out (health check → DB + Redis in parallel) ═════════════
-  { id: '24', timestamp: '2026-03-02T10:10:05.000Z', container: 'monitoring-sys',     service: 'Monitoring System',  level: 'info',    message: 'GET /health',                                      host: 'monitoring-01.us-east',  requestId: 'req-004' },
-  { id: '25', timestamp: '2026-03-02T10:10:05.050Z', container: 'api-gateway-01',     service: 'API Gateway',        level: 'info',    message: 'Running health checks',                            host: 'srv-prod-01.us-east',    requestId: 'req-004' },
-  { id: '26', timestamp: '2026-03-02T10:10:05.100Z', container: 'database-01',        service: 'Database',           level: 'info',    message: 'Health ping OK, 12ms',                             host: 'db-prod-01.us-east',     requestId: 'req-004' },
-  { id: '27', timestamp: '2026-03-02T10:10:05.130Z', container: 'api-gateway-01',     service: 'API Gateway',        level: 'info',    message: 'DB check passed',                                  host: 'srv-prod-01.us-east',    requestId: 'req-004' },
-  { id: '28', timestamp: '2026-03-02T10:10:05.150Z', container: 'redis-cache-01',     service: 'Redis Cache',        level: 'info',    message: 'Health ping OK, 8ms',                              host: 'cache-prod-01.us-east',  requestId: 'req-004' },
-  { id: '29', timestamp: '2026-03-02T10:10:05.180Z', container: 'api-gateway-01',     service: 'API Gateway',        level: 'success', message: 'All checks passed',                                host: 'srv-prod-01.us-east',    requestId: 'req-004' },
-  { id: '30', timestamp: '2026-03-02T10:10:05.200Z', container: 'monitoring-sys',     service: 'Monitoring System',  level: 'success', message: 'Health check OK, 200ms total',                     host: 'monitoring-01.us-east',  requestId: 'req-004' },
+[2026-03-18 05:00:55.869] [DEBUG] [request_id=5e355c48-868a-42c6-9cc9-25500a8e1de8] [thread=http-nio-8080-exec-6] [class=com.du.bff.common.logging.LogService] [method=logGQLIncomingRequest] [pod=du-bff] - Incoming GQL request: Started At: 2026-03-18T05:00:55.868Z | Operation: query searchAddress($gaid: String!) { searchAddress(gaid: $gaid) { fixedLineActive addressUnit { id formattedAddress emirate city area street buildingName latitude longitude gid gaid } } } | Variables: {gaid=DXB_E3279L_13610_005404040}
 
-  // ═══ req-005: Simple cache clear ══════════════════════════════════════════
-  { id: '31', timestamp: '2026-03-02T10:11:15.000Z', container: 'cli-tool',           service: 'CLI Tool',           level: 'info',    message: 'Command: cache-clear --pattern user:session:*',    host: 'admin-laptop',           requestId: 'req-005' },
-  { id: '32', timestamp: '2026-03-02T10:11:15.100Z', container: 'cache-service-01',   service: 'Cache Service',      level: 'info',    message: 'Executing FLUSHDB for pattern user:session:*',     host: 'srv-prod-04.us-east',    requestId: 'req-005' },
-  { id: '33', timestamp: '2026-03-02T10:11:15.200Z', container: 'redis-01',           service: 'Redis',              level: 'info',    message: 'Deleted 1,247 keys',                               host: 'cache-prod-02.us-east',  requestId: 'req-005' },
-  { id: '34', timestamp: '2026-03-02T10:11:15.700Z', container: 'cache-service-01',   service: 'Cache Service',      level: 'success', message: 'Cache cleared, 1247 keys removed',                 host: 'srv-prod-04.us-east',    requestId: 'req-005' },
-  { id: '35', timestamp: '2026-03-02T10:11:15.800Z', container: 'cli-tool',           service: 'CLI Tool',           level: 'success', message: 'Done in 800ms',                                    host: 'admin-laptop',           requestId: 'req-005' },
+[2026-03-18 05:00:55.870] [DEBUG] [request_id=5e355c48-868a-42c6-9cc9-25500a8e1de8] [thread=http-nio-8080-exec-6] [class=com.du.bff.common.logging.LogService] [method=logOutgoingGqlRequest] [pod=du-bff] - Outgoing GQL request — POST http://du-ngil-lite:8080/ngil/v5/graphql | Operation: query searchAddressOrchestrated | Variables: {"input":{"gaid":"DXB_E3279L_13610_005404040"}}
 
-  // ═══ req-006: Notification error ══════════════════════════════════════════
-  { id: '36', timestamp: '2026-03-02T10:09:45.000Z', container: 'mobile-app',         service: 'Mobile App',         level: 'info',    message: 'Triggered by order shipment event',                host: 'client-device',          requestId: 'req-006' },
-  { id: '37', timestamp: '2026-03-02T10:09:45.100Z', container: 'notif-svc-01',       service: 'Notification Service', level: 'info',  message: 'Preparing push notification',                      host: 'srv-prod-04.us-east',    requestId: 'req-006' },
-  { id: '38', timestamp: '2026-03-02T10:09:45.250Z', container: 'fcm-adapter',        service: 'FCM (Firebase)',     level: 'error',   message: 'Device token invalid — NotRegistered',             host: 'srv-external-02.us-east', requestId: 'req-006' },
-  { id: '39', timestamp: '2026-03-02T10:09:45.400Z', container: 'notif-svc-01',       service: 'Notification Service', level: 'error', message: 'Push notification failed',                         host: 'srv-prod-04.us-east',    requestId: 'req-006' },
-  { id: '40', timestamp: '2026-03-02T10:09:45.500Z', container: 'mobile-app',         service: 'Mobile App',         level: 'warn',    message: 'Notification not delivered',                        host: 'client-device',          requestId: 'req-006' },
+[2026-03-18 05:00:55.871] [INFO] [request_id=5e355c48-868a-42c6-9cc9-25500a8e1de8] [thread=http-nio-8080-exec-1] [class=com.du.orchestrator.logging.LogService] [method=logHttpIncomingRequest] [pod=service-du-ng11-lite] - HTTP Incoming Request — POST /graphql, operation=searchAddressOrchestrated
 
-  // ═══ req-007: File upload (linear, success) ═══════════════════════════════
-  { id: '41', timestamp: '2026-03-02T10:08:18.000Z', container: 'web-browser',        service: 'Web Browser',        level: 'info',    message: 'POST /api/files/upload (2.4MB)',                   host: 'client-browser',         requestId: 'req-007' },
-  { id: '42', timestamp: '2026-03-02T10:08:18.100Z', container: 'api-gateway-01',     service: 'API Gateway',        level: 'info',    message: 'Routing to storage service',                       host: 'srv-prod-01.us-east',    requestId: 'req-007' },
-  { id: '43', timestamp: '2026-03-02T10:08:18.200Z', container: 'storage-svc-01',     service: 'Storage Service',    level: 'info',    message: 'Validating and processing file',                   host: 'srv-prod-05.us-east',    requestId: 'req-007' },
-  { id: '44', timestamp: '2026-03-02T10:08:18.300Z', container: 's3-adapter',         service: 'AWS S3',             level: 'info',    message: 'Uploading to bucket prod-files',                   host: 'srv-external-03.us-east', requestId: 'req-007' },
-  { id: '45', timestamp: '2026-03-02T10:08:19.400Z', container: 'storage-svc-01',     service: 'Storage Service',    level: 'success', message: 'File stored, URL generated',                       host: 'srv-prod-05.us-east',    requestId: 'req-007' },
-  { id: '46', timestamp: '2026-03-02T10:08:19.500Z', container: 'api-gateway-01',     service: 'API Gateway',        level: 'success', message: 'Returning file URL',                                host: 'srv-prod-01.us-east',    requestId: 'req-007' },
-  { id: '47', timestamp: '2026-03-02T10:08:19.600Z', container: 'web-browser',        service: 'Web Browser',        level: 'success', message: 'File uploaded successfully',                        host: 'client-browser',         requestId: 'req-007' },
+[2026-03-18 05:00:55.892] [INFO] [request_id=5e355c48-868a-42c6-9cc9-25500a8e1de8] [thread=http-nio-8080-exec-1] [class=com.du.orchestrator.logging.LogService] [method=logHttpOutgoingRequest] [pod=service-du-ng11-lite] - HTTP Outgoing Request — GET /api/v1/tbapi/addressManagement/search?query=DXB_E3279L_13610_005404040
 
-  // ═══ req-008: ML Recommendations (fan-out: ML → Cache + DB) ═══════════════
-  { id: '48', timestamp: '2026-03-02T09:15:30.000Z', container: 'web-browser',        service: 'Web Browser',        level: 'info',    message: 'GET /api/recommendations/user/12345',              host: 'client-browser',         requestId: 'req-008' },
-  { id: '49', timestamp: '2026-03-02T09:15:30.100Z', container: 'api-gateway-02',     service: 'API Gateway',        level: 'info',    message: 'Routing to ML service',                            host: 'srv-prod-01.us-east',    requestId: 'req-008' },
-  { id: '50', timestamp: '2026-03-02T09:15:30.200Z', container: 'ml-svc-01',          service: 'ML Service',         level: 'info',    message: 'Running recommendation model',                     host: 'srv-ml-01.us-east',      requestId: 'req-008' },
-  { id: '51', timestamp: '2026-03-02T09:15:30.250Z', container: 'redis-cache-02',     service: 'Redis Cache',        level: 'info',    message: 'Cache miss for user 12345',                        host: 'cache-prod-01.us-east',  requestId: 'req-008' },
-  { id: '52', timestamp: '2026-03-02T09:15:30.300Z', container: 'ml-svc-01',          service: 'ML Service',         level: 'info',    message: 'Fetching user interaction history',                 host: 'srv-ml-01.us-east',      requestId: 'req-008' },
-  { id: '53', timestamp: '2026-03-02T09:15:30.400Z', container: 'user-behavior-db',   service: 'User Behavior DB',   level: 'info',    message: 'Returning 2,847 interaction records',              host: 'db-ml-01.us-east',       requestId: 'req-008' },
-  { id: '54', timestamp: '2026-03-02T09:15:33.800Z', container: 'ml-svc-01',          service: 'ML Service',         level: 'success', message: 'Generated 20 recommendations',                     host: 'srv-ml-01.us-east',      requestId: 'req-008' },
-  { id: '55', timestamp: '2026-03-02T09:15:33.850Z', container: 'api-gateway-02',     service: 'API Gateway',        level: 'success', message: 'Returning recommendations, 3.8s',                   host: 'srv-prod-01.us-east',    requestId: 'req-008' },
-  { id: '56', timestamp: '2026-03-02T09:15:33.900Z', container: 'web-browser',        service: 'Web Browser',        level: 'success', message: 'Recommendations loaded',                            host: 'client-browser',         requestId: 'req-008' },
+[2026-03-18 05:00:55.893] [ERROR] [request_id=5e355c48-868a-42c6-9cc9-25500a8e1de8] [thread=http-nio-8080-exec-1] [class=com.du.orchestrator.logging.LogService] [method=logAxiosIncomingResponse] [pod=service-du-ng11-lite] - Axios Incoming Response — status=503, Request failed with status code 503, url=/api/v1/tbapi/addressManagement/search
 
-  // ═══ req-009: Order validation error (short) ══════════════════════════════
-  { id: '57', timestamp: '2026-03-02T08:55:16.000Z', container: 'mobile-app',         service: 'Mobile App',         level: 'info',    message: 'POST /api/orders/create',                          host: 'client-device',          requestId: 'req-009' },
-  { id: '58', timestamp: '2026-03-02T08:55:16.100Z', container: 'api-gateway-01',     service: 'API Gateway',        level: 'info',    message: 'Routing to order service',                          host: 'srv-prod-01.us-east',    requestId: 'req-009' },
-  { id: '59', timestamp: '2026-03-02T08:55:16.200Z', container: 'order-svc-01',       service: 'Order Service',      level: 'error',   message: 'Order validation failed: invalid shipping address', host: 'srv-prod-13.us-east',    requestId: 'req-009' },
-  { id: '60', timestamp: '2026-03-02T08:55:17.100Z', container: 'api-gateway-01',     service: 'API Gateway',        level: 'error',   message: '400 Bad Request — validation error',                host: 'srv-prod-01.us-east',    requestId: 'req-009' },
-  { id: '61', timestamp: '2026-03-02T08:55:17.200Z', container: 'mobile-app',         service: 'Mobile App',         level: 'warn',    message: 'Showing validation error to user',                  host: 'client-device',          requestId: 'req-009' },
-];
+[2026-03-18 05:00:55.895] [ERROR] [request_id=5e355c48-868a-42c6-9cc9-25500a8e1de8] [thread=http-nio-8080-exec-1] [class=com.du.orchestrator.logging.LogService] [method=logError] [pod=service-du-ng11-lite] - Error occurred while searching address — INTERNAL_SERVER_ERROR, data: {searchAddress: null}
+
+[2026-03-18 05:00:55.897] [INFO] [request_id=5e355c48-868a-42c6-9cc9-25500a8e1de8] [thread=http-nio-8080-exec-1] [class=com.du.orchestrator.logging.LogService] [method=logHttpOutgoingResponse] [pod=service-du-ng11-lite] - HTTP Outgoing Response — status=200, body={data: {searchAddress: null}, errors: [INTERNAL_SERVER_ERROR]}
+
+[2026-03-18 05:00:55.900] [ERROR] [request_id=5e355c48-868a-42c6-9cc9-25500a8e1de8] [thread=http-nio-8080-exec-6] [class=com.du.bff.common.logging.LogService] [method=logIncomingGqlResponse] [pod=du-bff] - Incoming GQL response — errors: [INTERNAL_SERVER_ERROR], searchAddress=null
+
+[2026-03-18 05:00:55.930] [ERROR] [request_id=5e355c48-868a-42c6-9cc9-25500a8e1de8] [thread=http-nio-8080-exec-6] [class=com.du.bff.common.logging.LogService] [method=logOutgoingResponse] [pod=du-bff] - Outgoing response — status=500, response={data: null, errors: ["error occurred while searching address"]}
+
+[2026-03-18 05:01:10.100] [INFO] [request_id=a1b2c3d4-e5f6-7890-abcd-ef1234567890] [thread=http-nio-8080-exec-3] [class=com.du.bff.common.logging.LogService] [method=logIncomingRequest] [pod=du-bff] - Incoming request: [POST] /graphql | Operation: query getAccountDetails
+
+[2026-03-18 05:01:10.150] [INFO] [request_id=a1b2c3d4-e5f6-7890-abcd-ef1234567890] [thread=http-nio-8080-exec-3] [class=com.du.bff.common.logging.LogService] [method=logTokenExchange] [pod=du-bff] - Successful token exchange — tokenType=Bearer, expiresIn=3600
+
+[2026-03-18 05:01:10.200] [DEBUG] [request_id=a1b2c3d4-e5f6-7890-abcd-ef1234567890] [thread=http-nio-8080-exec-3] [class=com.du.bff.common.logging.LogService] [method=logOutgoingGqlRequest] [pod=du-bff] - Outgoing GQL request — POST http://du-ngil-lite:8080/ngil/v5/graphql | Operation: query getAccountDetailsOrchestrated
+
+[2026-03-18 05:01:10.350] [INFO] [request_id=a1b2c3d4-e5f6-7890-abcd-ef1234567890] [thread=http-nio-8080-exec-2] [class=com.du.orchestrator.logging.LogService] [method=logHttpIncomingRequest] [pod=service-du-ng11-lite] - HTTP Incoming Request — POST /graphql, operation=getAccountDetailsOrchestrated
+
+[2026-03-18 05:01:10.400] [INFO] [request_id=a1b2c3d4-e5f6-7890-abcd-ef1234567890] [thread=http-nio-8080-exec-2] [class=com.du.orchestrator.logging.LogService] [method=logHttpOutgoingRequest] [pod=service-du-ng11-lite] - HTTP Outgoing Request — GET /api/v1/tbapi/accountManagement/details?accountId=ACC-001
+
+[2026-03-18 05:01:10.580] [INFO] [request_id=a1b2c3d4-e5f6-7890-abcd-ef1234567890] [thread=http-nio-8080-exec-2] [class=com.du.orchestrator.logging.LogService] [method=logAxiosIncomingResponse] [pod=service-du-ng11-lite] - Axios Incoming Response — status=200, data={accountId: "ACC-001", name: "John Doe"}
+
+[2026-03-18 05:01:10.590] [INFO] [request_id=a1b2c3d4-e5f6-7890-abcd-ef1234567890] [thread=http-nio-8080-exec-2] [class=com.du.orchestrator.logging.LogService] [method=logHttpOutgoingResponse] [pod=service-du-ng11-lite] - HTTP Outgoing Response — status=200, body={data: {getAccountDetails: {accountId: "ACC-001"}}}
+
+[2026-03-18 05:01:10.620] [INFO] [request_id=a1b2c3d4-e5f6-7890-abcd-ef1234567890] [thread=http-nio-8080-exec-3] [class=com.du.bff.common.logging.LogService] [method=logIncomingGqlResponse] [pod=du-bff] - Incoming GQL response — data: {getAccountDetails: {...}}, no errors
+
+[2026-03-18 05:01:10.650] [INFO] [request_id=a1b2c3d4-e5f6-7890-abcd-ef1234567890] [thread=http-nio-8080-exec-3] [class=com.du.bff.common.logging.LogService] [method=logOutgoingResponse] [pod=du-bff] - Outgoing response — status=200, completed in 550ms
+
+[2026-03-18 05:02:01.000] [INFO] [request_id=f7e6d5c4-b3a2-1098-7654-321fedcba987] [thread=http-nio-8080-exec-5] [class=com.du.bff.common.logging.LogService] [method=logIncomingRequest] [pod=du-bff] - Incoming request: [POST] /graphql | Operation: mutation createOrder
+
+[2026-03-18 05:02:01.050] [INFO] [request_id=f7e6d5c4-b3a2-1098-7654-321fedcba987] [thread=http-nio-8080-exec-5] [class=com.du.bff.common.logging.LogService] [method=logTokenExchange] [pod=du-bff] - Successful token exchange — tokenType=Bearer
+
+[2026-03-18 05:02:01.100] [DEBUG] [request_id=f7e6d5c4-b3a2-1098-7654-321fedcba987] [thread=http-nio-8080-exec-5] [class=com.du.bff.common.logging.LogService] [method=logOutgoingGqlRequest] [pod=du-bff] - Outgoing GQL request — POST http://du-ngil-lite:8080/ngil/v5/graphql | Operation: mutation createOrderOrchestrated | Variables: {orderId: "ORD-5521"}
+
+[2026-03-18 05:02:01.250] [INFO] [request_id=f7e6d5c4-b3a2-1098-7654-321fedcba987] [thread=http-nio-8080-exec-4] [class=com.du.orchestrator.logging.LogService] [method=logHttpIncomingRequest] [pod=service-du-ng11-lite] - HTTP Incoming Request — POST /graphql, operation=createOrderOrchestrated
+
+[2026-03-18 05:02:01.300] [INFO] [request_id=f7e6d5c4-b3a2-1098-7654-321fedcba987] [thread=http-nio-8080-exec-4] [class=com.du.orchestrator.logging.LogService] [method=logHttpOutgoingRequest] [pod=service-du-ng11-lite] - HTTP Outgoing Request — POST /api/v1/tbapi/paymentManagement/charge, body={orderId: "ORD-5521", amount: 299.00}
+
+[2026-03-18 05:02:01.550] [INFO] [request_id=f7e6d5c4-b3a2-1098-7654-321fedcba987] [thread=http-nio-8080-exec-4] [class=com.du.orchestrator.logging.LogService] [method=logAxiosIncomingResponse] [pod=service-du-ng11-lite] - Axios Incoming Response — status=200, transactionId=TXN-88431, url=/api/v1/tbapi/paymentManagement/charge
+
+[2026-03-18 05:02:01.600] [INFO] [request_id=f7e6d5c4-b3a2-1098-7654-321fedcba987] [thread=http-nio-8080-exec-4] [class=com.du.orchestrator.logging.LogService] [method=logHttpOutgoingRequest] [pod=service-du-ng11-lite] - HTTP Outgoing Request — POST /api/v1/tbapi/inventoryManagement/reserve, body={itemId: "ITEM-7712"}
+
+[2026-03-18 05:02:01.800] [INFO] [request_id=f7e6d5c4-b3a2-1098-7654-321fedcba987] [thread=http-nio-8080-exec-4] [class=com.du.orchestrator.logging.LogService] [method=logAxiosIncomingResponse] [pod=service-du-ng11-lite] - Axios Incoming Response — status=200, reserved=true, itemId=ITEM-7712, url=/api/v1/tbapi/inventoryManagement/reserve
+
+[2026-03-18 05:02:01.850] [INFO] [request_id=f7e6d5c4-b3a2-1098-7654-321fedcba987] [thread=http-nio-8080-exec-4] [class=com.du.orchestrator.logging.LogService] [method=logHttpOutgoingResponse] [pod=service-du-ng11-lite] - HTTP Outgoing Response — status=200, body={data: {createOrder: {orderId: "ORD-5521", status: "confirmed"}}}
+
+[2026-03-18 05:02:01.880] [INFO] [request_id=f7e6d5c4-b3a2-1098-7654-321fedcba987] [thread=http-nio-8080-exec-5] [class=com.du.bff.common.logging.LogService] [method=logIncomingGqlResponse] [pod=du-bff] - Incoming GQL response — data: {createOrder: {orderId: "ORD-5521", status: "confirmed"}}
+
+[2026-03-18 05:02:01.900] [INFO] [request_id=f7e6d5c4-b3a2-1098-7654-321fedcba987] [thread=http-nio-8080-exec-5] [class=com.du.bff.common.logging.LogService] [method=logOutgoingResponse] [pod=du-bff] - Outgoing response — status=200, completed in 900ms
+
+[2026-03-18 05:03:20.000] [INFO] [request_id=bb11cc22-dd33-ee44-ff55-667788990011] [thread=http-nio-8080-exec-7] [class=com.du.bff.common.logging.LogService] [method=logIncomingRequest] [pod=du-bff] - Incoming request: [POST] /graphql | Operation: query getBalance
+
+[2026-03-18 05:03:20.050] [DEBUG] [request_id=bb11cc22-dd33-ee44-ff55-667788990011] [thread=http-nio-8080-exec-7] [class=com.du.bff.common.logging.LogService] [method=logOutgoingGqlRequest] [pod=du-bff] - Outgoing GQL request — POST http://du-ngil-lite:8080/ngil/v5/graphql | Operation: query getBalanceOrchestrated
+
+[2026-03-18 05:03:20.200] [INFO] [request_id=bb11cc22-dd33-ee44-ff55-667788990011] [thread=http-nio-8080-exec-8] [class=com.du.orchestrator.logging.LogService] [method=logHttpIncomingRequest] [pod=service-du-ng11-lite] - HTTP Incoming Request — POST /graphql, operation=getBalanceOrchestrated
+
+[2026-03-18 05:03:20.250] [INFO] [request_id=bb11cc22-dd33-ee44-ff55-667788990011] [thread=http-nio-8080-exec-8] [class=com.du.orchestrator.logging.LogService] [method=logHttpOutgoingRequest] [pod=service-du-ng11-lite] - HTTP Outgoing Request — GET /api/v1/tbapi/balanceManagement/balance?msisdn=971501234567
+
+[2026-03-18 05:03:25.250] [ERROR] [request_id=bb11cc22-dd33-ee44-ff55-667788990011] [thread=http-nio-8080-exec-8] [class=com.du.orchestrator.logging.LogService] [method=logAxiosIncomingResponse] [pod=service-du-ng11-lite] - Axios Incoming Response — ECONNABORTED, timeout of 5000ms exceeded, url=/api/v1/tbapi/balanceManagement/balance
+
+[2026-03-18 05:03:25.260] [ERROR] [request_id=bb11cc22-dd33-ee44-ff55-667788990011] [thread=http-nio-8080-exec-8] [class=com.du.orchestrator.logging.LogService] [method=logError] [pod=service-du-ng11-lite] - Error occurred while fetching balance — GATEWAY_TIMEOUT, data: {getBalance: null}
+
+[2026-03-18 05:03:25.280] [ERROR] [request_id=bb11cc22-dd33-ee44-ff55-667788990011] [thread=http-nio-8080-exec-7] [class=com.du.bff.common.logging.LogService] [method=logIncomingGqlResponse] [pod=du-bff] - Incoming GQL response — errors: [GATEWAY_TIMEOUT], getBalance=null
+
+[2026-03-18 05:03:25.300] [ERROR] [request_id=bb11cc22-dd33-ee44-ff55-667788990011] [thread=http-nio-8080-exec-7] [class=com.du.bff.common.logging.LogService] [method=logOutgoingResponse] [pod=du-bff] - Outgoing response — status=504, Gateway Timeout, completed in 5300ms
+`;
+
+export const mockLogs: Log[] = parseRawLogText(RAW_LOGS);
 
 export const logFields = [
   { key: 'timestamp', label: 'Timestamp', enabled: true },

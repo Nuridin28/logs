@@ -1,15 +1,10 @@
 import type { ComponentType } from 'react';
 import type { ChipProps, SvgIconProps } from '@mui/material';
 
-// ─── Domain types ────────────────────────────────────────────────────────────
-
 export type LogLevel = 'info' | 'warn' | 'error' | 'debug' | 'success';
 export type NodeType = 'client' | 'gateway' | 'service' | 'database' | 'external' | 'cache';
 export type Status = 'success' | 'error' | 'pending';
 
-// ─── Flow graph ──────────────────────────────────────────────────────────────
-
-/** Участник диаграммы (колонка) */
 export interface FlowNode {
   id: string;
   name: string;
@@ -17,7 +12,6 @@ export interface FlowNode {
   status: Status;
 }
 
-/** Связь между участниками (стрелка) */
 export interface FlowEdge {
   id: string;
   from: string;
@@ -28,15 +22,13 @@ export interface FlowEdge {
   duration?: number;
   label?: string;
   isErrorSource?: boolean;
+  relatedLogId?: string;
 }
 
-/** Граф запроса: узлы + рёбра */
 export interface RequestFlow {
   nodes: FlowNode[];
   edges: FlowEdge[];
 }
-
-// ─── Data models ─────────────────────────────────────────────────────────────
 
 export interface Log {
   id: string;
@@ -49,34 +41,26 @@ export interface Log {
   requestId?: string;
 }
 
-// ─── Sequence diagram ────────────────────────────────────────────────────────
-
 export interface SeqEvent {
   id: string;
   fromCol: number;
   toCol: number;
   label: string;
-  details?: string;
   status: Status;
   duration?: number;
   isResponse: boolean;
   timestamp: string;
-  relatedLog?: Log;
+  relatedLogId?: string;
   isErrorSource?: boolean;
 }
-
-// ─── Config records ──────────────────────────────────────────────────────────
 
 export interface LevelConfigEntry {
   Icon: ComponentType<SvgIconProps>;
   color: ChipProps['color'];
 }
 
-// ─── Component props ─────────────────────────────────────────────────────────
-
 export interface RequestFlowProps {
   requestId: string;
   logs: Log[];
-  /** Called when user clicks "View" on a log entry. */
   onViewLog?: (logId: string) => void;
 }

@@ -1,6 +1,7 @@
 import { Box, Typography, alpha } from '@mui/material';
 import { ArrowForward, ArrowBack, Warning, ExpandMore, ExpandLess } from '@mui/icons-material';
 import { COL_W } from '../constants';
+import { formatDuration } from '../helpers';
 import type { Status } from '../types';
 
 interface MsgLabelProps {
@@ -54,7 +55,7 @@ export default function MsgLabel({
           : (isDark ? 'background.paper' : '#fff'),
         borderRadius: '4px',
         border: `1px solid ${alpha(borderColor, isErr ? 0.5 : 0.3)}`,
-        maxWidth: Math.max(maxW, 100),
+        maxWidth: Math.max(maxW, 120),
         display: 'flex', alignItems: 'center', gap: 0.5,
         boxShadow: isErrorSource
           ? `0 0 0 2px ${alpha('#ef4444', 0.3)}, 0 2px 8px ${alpha('#ef4444', 0.2)}`
@@ -71,23 +72,24 @@ export default function MsgLabel({
     >
       {!isSelf && (
         isResponse
-          ? <ArrowBack sx={{ fontSize: 12, color: borderColor, flexShrink: 0 }} />
-          : <ArrowForward sx={{ fontSize: 12, color: borderColor, flexShrink: 0 }} />
+          ? <ArrowBack sx={{ fontSize: 11, color: borderColor, flexShrink: 0 }} />
+          : <ArrowForward sx={{ fontSize: 11, color: borderColor, flexShrink: 0 }} />
       )}
-      {isErr && <Warning sx={{ fontSize: 12, color: '#ef4444', flexShrink: 0 }} />}
+      {isErr && <Warning sx={{ fontSize: 11, color: '#ef4444', flexShrink: 0 }} />}
       <Typography variant="caption" fontWeight={isErr ? 700 : 600} noWrap
         sx={{
-          fontSize: '0.66rem',
+          fontSize: '0.65rem',
           color: isErr ? '#ef4444' : (isDark ? '#e2e8f0' : '#334155'),
-          fontStyle: isResponse ? 'italic' : 'normal',
+          fontStyle: isResponse && !isErr ? 'italic' : 'normal',
         }}>
         {label}
       </Typography>
-      {duration != null && isResponse && !isErr && (
-        <Typography variant="caption" sx={{
-          fontSize: '0.6rem', color: 'text.secondary', fontFamily: 'monospace', flexShrink: 0,
+      {duration != null && (
+        <Typography variant="caption" fontFamily="monospace" sx={{
+          fontSize: '0.6rem', fontWeight: 700, flexShrink: 0,
+          color: isErr ? alpha('#ef4444', 0.7) : 'text.secondary',
         }}>
-          {duration}ms
+          {formatDuration(duration)}
         </Typography>
       )}
       {isExpanded

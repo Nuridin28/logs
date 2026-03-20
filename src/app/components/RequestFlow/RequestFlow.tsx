@@ -1,10 +1,13 @@
 import React, { useState, useMemo } from 'react';
-import { Box, Typography, Button, Collapse, useTheme, alpha } from '@mui/material';
-import { Error as ErrorIcon, ArrowForward, ArrowBack } from '@mui/icons-material';
+import { Box, Typography, Button, Chip, Collapse, useTheme, alpha } from '@mui/material';
+import {
+  Error as ErrorIcon, ArrowForward, ArrowBack,
+  Timeline, UnfoldMore, UnfoldLess,
+} from '@mui/icons-material';
 
 import type { NodeType, Status, RequestFlowProps } from './types';
 import { COL_W, TS_W, ROW_H } from './constants';
-import { getColor, buildSequence, buildGraphFromLogs } from './helpers';
+import { getColor, buildSequence, buildGraphFromLogs, formatDuration, formatTimestamp } from './helpers';
 
 import Card from './ui/Card';
 import EmptyState from './ui/EmptyState';
@@ -17,31 +20,22 @@ export default function RequestFlow({ requestId, logs, onViewLog }: RequestFlowP
   const isDark = theme.palette.mode === 'dark';
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
-  // ─── Derived data ────────────────────────────────────────────────────────
-
   const requestLogs = useMemo(
-    () =>
-      logs
-        .filter((log) => log.requestId === requestId)
-        .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()),
+    () => logs
+      .filter((log) => log.requestId === requestId)
+      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()),
     [logs, requestId],
   );
 
   const flow = useMemo(() => buildGraphFromLogs(requestLogs), [requestLogs]);
-
-  const nodes = flow.nodes;
-  const edges = flow.edges;
+  const { nodes, edges } = flow;
 
   const services = useMemo(() => {
     const seen = new Set<string>();
-    const result: string[] = [];
-    for (const node of nodes) {
-      if (!seen.has(node.name)) {
-        seen.add(node.name);
-        result.push(node.name);
-      }
-    }
-    return result;
+    return nodes.reduce<string[]>((acc, n) => {
+      if (!seen.has(n.name)) { seen.add(n.name); acc.push(n.name); }
+      return acc;
+    }, []);
   }, [nodes]);
 
   const serviceTypes = useMemo(() => {
@@ -58,152 +52,125 @@ export default function RequestFlow({ requestId, logs, onViewLog }: RequestFlowP
 
   const seqEvents = useMemo(() => buildSequence(edges, services), [edges, services]);
 
-  const errorNode = nodes.find((n) => n.status === 'error');
+  const errorEdge = edges.find((e) => e.isErrorSource);
+  const errorLog = errorEdge?.relatedLogId
+    ? requestLogs.find((l) => l.id === errorEdge.relatedLogId)
+    : undefined;
 
-  // ─── Expand / collapse ───────────────────────────────────────────────────
+  const totalDuration = requestLogs.length >= 2
+    ? new Date(requestLogs[requestLogs.length - 1].timestamp).getTime() - new Date(requestLogs[0].timestamp).getTime()
+    : 0;
 
   const toggle = (id: string) =>
     setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
 
-  const expandAll = () => {
-    const next: Record<string, boolean> = {};
-    for (const e of seqEvents) next[e.id] = true;
-    setExpanded(next);
+  const hasExpanded = Object.values(expanded).some(Boolean);
+  const toggleAll = () => {
+    if (hasExpanded) {
+      setExpanded({});
+    } else {
+      const next: Record<string, boolean> = {};
+      for (const e of seqEvents) next[e.id] = true;
+      setExpanded(next);
+    }
   };
-
-  const collapseAll = () => setExpanded({});
-
-  // ─── Empty state ─────────────────────────────────────────────────────────
 
   if (requestLogs.length === 0) {
     return (
-      <Box sx={{ maxWidth: 1200, mx: 'auto' }}>
-        <EmptyState
-          icon={ErrorIcon}
-          title="Request Not Found"
-          description={
-            <>No logs found for request ID: <Typography component="span" fontFamily="monospace" fontWeight={600}>{requestId}</Typography></>
-          }
-        />
-      </Box>
+      <EmptyState
+        icon={ErrorIcon}
+        title="No logs found"
+        description={
+          <>No logs for <Typography component="span" fontFamily="monospace" fontWeight={600}>{requestId}</Typography></>
+        }
+      />
     );
   }
 
-  // ─── Layout helpers ──────────────────────────────────────────────────────
-
   const totalW = TS_W + services.length * COL_W;
-
-  const renderLifelines = (activeCol?: number) =>
-    services.map((s, i) => (
-      <Lifeline
-        key={i}
-        color={getColor(i)}
-        isError={serviceStatuses[s] === 'error'}
-        isActive={i === activeCol}
-        isDark={isDark}
-      />
-    ));
-
-  const renderParticipants = () => (
-    <Box sx={{ display: 'flex', bgcolor: isDark ? alpha('#fff', 0.02) : alpha('#000', 0.012), py: 1.5 }}>
-      <Box sx={{ width: TS_W, minWidth: TS_W, flexShrink: 0 }} />
-      {services.map((s, i) => (
-        <Box key={s} sx={{ width: COL_W, minWidth: COL_W, display: 'flex', justifyContent: 'center' }}>
-          <Participant name={s} color={getColor(i)} type={serviceTypes[s]} status={serviceStatuses[s]} isDark={isDark} />
-        </Box>
-      ))}
-    </Box>
-  );
-
-  const renderConnector = (height = 10, borderTop = false) => (
-    <Box sx={{
-      display: 'flex', height,
-      ...(borderTop && { borderTop: `1px solid ${isDark ? alpha('#fff', 0.05) : alpha('#000', 0.05)}` }),
-    }}>
-      <Box sx={{ width: TS_W, minWidth: TS_W, flexShrink: 0 }} />
-      {services.map((s, i) => {
-        const c = getColor(i);
-        const isErr = serviceStatuses[s] === 'error';
-        return (
-          <Box key={i} sx={{ width: COL_W, minWidth: COL_W, position: 'relative' }}>
-            <Box sx={{
-              position: 'absolute', top: 0, bottom: 0, left: '50%', width: 0,
-              borderLeft: `1.5px dashed ${alpha(isErr ? '#ef4444' : c, isDark ? 0.2 : 0.15)}`,
-              transform: 'translateX(-0.75px)',
-            }} />
-          </Box>
-        );
-      })}
-    </Box>
-  );
-
-  // ─── Render ──────────────────────────────────────────────────────────────
 
   return (
     <Box sx={{ maxWidth: 1200, mx: 'auto' }}>
-      {/* Header */}
-      <Box sx={{ mb: { xs: 2, sm: 3 } }}>
-        <Typography variant="h5" fontWeight={600} sx={{ mb: 0.5 }}>
-          Request Flow
-        </Typography>
-        <Typography color="text.secondary">
-          Sequence diagram for{' '}
-          <Typography component="span" fontFamily="monospace" fontWeight={600} fontSize="inherit">
+      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 2, flexWrap: 'wrap', gap: 1 }}>
+        <Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+            <Timeline sx={{ fontSize: 20, color: 'primary.main' }} />
+            <Typography variant="h6" fontWeight={700}>Request Flow</Typography>
+          </Box>
+          <Typography variant="body2" color="text.secondary" fontFamily="monospace" sx={{ fontSize: '0.75rem' }}>
             {requestId}
           </Typography>
-        </Typography>
-      </Box>
-
-      {errorNode && <ErrorBanner node={errorNode} isDark={isDark} />}
-
-      {/* Legend */}
-      <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap', alignItems: 'center' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-          <Box sx={{ width: 24, height: 0, borderTop: '2px solid #3b82f6' }} />
-          <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>Request</Typography>
         </Box>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-          <Box sx={{ width: 24, height: 0, borderTop: '2px dashed #94a3b8' }} />
-          <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>Response</Typography>
-        </Box>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-          <Box sx={{ width: 24, height: 0, borderTop: '2px dashed #ef4444' }} />
-          <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>Error</Typography>
+        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+          <Chip label={`${services.length} services`} size="small" variant="outlined" />
+          <Chip label={`${edges.length} calls`} size="small" variant="outlined" />
+          {totalDuration > 0 && (
+            <Chip label={formatDuration(totalDuration)} size="small" variant="outlined"
+              color={totalDuration > 3000 ? 'warning' : 'default'} />
+          )}
+          {requestLogs[0] && (
+            <Chip label={formatTimestamp(requestLogs[0].timestamp, { fractionalSeconds: true })} size="small" variant="outlined" />
+          )}
         </Box>
       </Box>
 
-      {/* Controls */}
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1 }}>
-        <Button
-          size="small"
-          onClick={Object.keys(expanded).length > 0 ? collapseAll : expandAll}
-          sx={{ color: 'text.secondary', textTransform: 'none', fontSize: '0.75rem' }}
-        >
-          {Object.keys(expanded).length > 0 ? 'Collapse All' : 'Expand All'}
+      {errorEdge && <ErrorBanner edge={errorEdge} log={errorLog} isDark={isDark} />}
+
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+          {[
+            { color: '#3b82f6', dash: false, label: 'Request' },
+            { color: '#94a3b8', dash: true, label: 'Response' },
+            { color: '#ef4444', dash: true, label: 'Error' },
+          ].map((item) => (
+            <Box key={item.label} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <Box sx={{ width: 20, height: 0, borderTop: `2px ${item.dash ? 'dashed' : 'solid'} ${item.color}` }} />
+              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.6rem' }}>
+                {item.label}
+              </Typography>
+            </Box>
+          ))}
+        </Box>
+        <Button size="small" onClick={toggleAll}
+          startIcon={hasExpanded ? <UnfoldLess /> : <UnfoldMore />}
+          sx={{ color: 'text.secondary', textTransform: 'none', fontSize: '0.7rem' }}>
+          {hasExpanded ? 'Collapse' : 'Expand'} All
         </Button>
       </Box>
 
-      {/* Diagram */}
       <Card sx={{ overflow: 'hidden' }}>
         <Box sx={{ overflowX: 'auto' }}>
           <Box sx={{ minWidth: totalW }}>
-            {renderParticipants()}
-            {renderConnector(10)}
+            <Box sx={{ display: 'flex', bgcolor: isDark ? alpha('#fff', 0.02) : alpha('#000', 0.012), py: 1.5 }}>
+              <Box sx={{ width: TS_W, minWidth: TS_W, flexShrink: 0 }} />
+              {services.map((s, i) => (
+                <Box key={s} sx={{ width: COL_W, minWidth: COL_W, display: 'flex', justifyContent: 'center' }}>
+                  <Participant name={s} color={getColor(i)} type={serviceTypes[s]} status={serviceStatuses[s]} isDark={isDark} />
+                </Box>
+              ))}
+            </Box>
 
-            {seqEvents.map((ev) => {
+            <Box sx={{ display: 'flex', height: 8 }}>
+              <Box sx={{ width: TS_W, minWidth: TS_W, flexShrink: 0 }} />
+              {services.map((s, i) => (
+                <Box key={i} sx={{ width: COL_W, minWidth: COL_W, position: 'relative' }}>
+                  <Box sx={{
+                    position: 'absolute', top: 0, bottom: 0, left: '50%', width: 0,
+                    borderLeft: `1.5px dashed ${alpha(serviceStatuses[s] === 'error' ? '#ef4444' : getColor(i), isDark ? 0.2 : 0.15)}`,
+                    transform: 'translateX(-0.75px)',
+                  }} />
+                </Box>
+              ))}
+            </Box>
+
+            {seqEvents.map((ev, idx) => {
               const isExp = expanded[ev.id] ?? false;
               const activeCol = ev.isResponse ? ev.fromCol : ev.toCol;
-              const serviceName = ev.isResponse ? services[ev.fromCol] : services[ev.toCol];
-              // Request → первый лог сервиса (что получил), Response → последний (что ответил)
-              let matchLog: typeof requestLogs[number] | undefined;
-              if (ev.isResponse) {
-                for (let i = requestLogs.length - 1; i >= 0; i--) {
-                  if (requestLogs[i].service === serviceName) { matchLog = requestLogs[i]; break; }
-                }
-              } else {
-                matchLog = requestLogs.find((l) => l.service === serviceName);
-              }
-              matchLog = matchLog ?? requestLogs[0];
+              const activeService = ev.isResponse ? services[ev.fromCol] : services[ev.toCol];
+              const matchLog = (ev.relatedLogId
+                ? requestLogs.find((l) => l.id === ev.relatedLogId)
+                : requestLogs.find((l) => l.service === activeService)
+              ) ?? requestLogs[0];
 
               return (
                 <React.Fragment key={ev.id}>
@@ -223,22 +190,30 @@ export default function RequestFlow({ requestId, logs, onViewLog }: RequestFlowP
                       borderRight: `1px solid ${isDark ? alpha('#fff', 0.04) : alpha('#000', 0.04)}`,
                       gap: 0.25,
                     }}>
+                      <Typography variant="caption" fontFamily="monospace" sx={{
+                        fontSize: '0.5rem', color: 'text.disabled', fontWeight: 500,
+                      }}>
+                        #{idx + 1}
+                      </Typography>
                       {ev.isResponse
                         ? <ArrowBack sx={{ fontSize: 11, color: ev.status === 'error' ? '#ef4444' : 'text.disabled' }} />
                         : <ArrowForward sx={{ fontSize: 11, color: '#3b82f6' }} />}
                       {ev.duration != null && (
                         <Typography variant="caption" fontFamily="monospace" sx={{
-                          fontSize: '0.58rem',
-                          color: ev.status === 'error' ? '#ef4444' : 'text.secondary',
-                          fontWeight: 600,
+                          fontSize: '0.55rem', fontWeight: 700,
+                          color: ev.status === 'error' ? '#ef4444' : ev.duration > 1000 ? '#f59e0b' : 'text.secondary',
                         }}>
-                          {ev.duration}ms
+                          {formatDuration(ev.duration)}
                         </Typography>
                       )}
                     </Box>
 
                     <Box sx={{ display: 'flex', position: 'relative', flex: 1 }}>
-                      {renderLifelines(activeCol)}
+                      {services.map((s, i) => (
+                        <Lifeline key={i} color={getColor(i)}
+                          isError={serviceStatuses[s] === 'error'}
+                          isActive={i === activeCol} isDark={isDark} />
+                      ))}
                       <SvgArrow fromCol={ev.fromCol} toCol={ev.toCol}
                         totalCols={services.length} isResponse={ev.isResponse} status={ev.status} />
                       <MsgLabel fromCol={ev.fromCol} toCol={ev.toCol}
@@ -250,23 +225,41 @@ export default function RequestFlow({ requestId, logs, onViewLog }: RequestFlowP
 
                   <Collapse in={isExp}>
                     {matchLog && (
-                      <DetailPanel
-                        log={matchLog}
+                      <DetailPanel log={matchLog}
                         color={ev.status === 'error' ? '#ef4444' : getColor(activeCol)}
-                        isDark={isDark}
-                        onViewLog={onViewLog}
-                      />
+                        isDark={isDark} onViewLog={onViewLog} />
                     )}
                   </Collapse>
                 </React.Fragment>
               );
             })}
 
-            {renderConnector(10, true)}
-            {renderParticipants()}
+            <Box sx={{
+              display: 'flex', height: 8,
+              borderTop: `1px solid ${isDark ? alpha('#fff', 0.05) : alpha('#000', 0.05)}`,
+            }}>
+              <Box sx={{ width: TS_W, minWidth: TS_W, flexShrink: 0 }} />
+              {services.map((s, i) => (
+                <Box key={i} sx={{ width: COL_W, minWidth: COL_W, position: 'relative' }}>
+                  <Box sx={{
+                    position: 'absolute', top: 0, bottom: 0, left: '50%', width: 0,
+                    borderLeft: `1.5px dashed ${alpha(serviceStatuses[s] === 'error' ? '#ef4444' : getColor(i), isDark ? 0.2 : 0.15)}`,
+                    transform: 'translateX(-0.75px)',
+                  }} />
+                </Box>
+              ))}
+            </Box>
+
+            <Box sx={{ display: 'flex', bgcolor: isDark ? alpha('#fff', 0.02) : alpha('#000', 0.012), py: 1.5 }}>
+              <Box sx={{ width: TS_W, minWidth: TS_W, flexShrink: 0 }} />
+              {services.map((s, i) => (
+                <Box key={s} sx={{ width: COL_W, minWidth: COL_W, display: 'flex', justifyContent: 'center' }}>
+                  <Participant name={s} color={getColor(i)} type={serviceTypes[s]} status={serviceStatuses[s]} isDark={isDark} />
+                </Box>
+              ))}
+            </Box>
           </Box>
         </Box>
-
       </Card>
     </Box>
   );

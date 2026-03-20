@@ -13,7 +13,7 @@ export default function SvgArrow({ fromCol, toCol, totalCols, isResponse, status
   const isSelf = fromCol === toCol;
   const w = totalCols * COL_W;
   const y = ROW_H / 2;
-  const color = status === 'error' ? '#ef4444' : status === 'pending' ? '#f59e0b' : '#94a3b8';
+  const color = status === 'error' ? '#ef4444' : isResponse ? '#94a3b8' : '#3b82f6';
 
   if (isSelf) {
     const cx = fromCol * COL_W + COL_W / 2;

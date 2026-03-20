@@ -30,14 +30,9 @@ export function formatTimestamp(
 }
 
 export function formatDuration(ms: number): string {
-  return ms > 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`;
+  if (ms >= 1000) return `${(ms / 1000).toFixed(1)}s`;
+  return `${ms}ms`;
 }
-
-export function formatDurationPrecise(ms: number): string {
-  return ms > 1000 ? `${(ms / 1000).toFixed(2)}s` : `${ms}ms`;
-}
-
-// ─── Build graph from raw logs ───────────────────────────────────────────────
 
 function levelPriority(level: LogLevel): number {
   switch (level) {
@@ -45,19 +40,33 @@ function levelPriority(level: LogLevel): number {
     case 'warn': return 3;
     case 'info': return 2;
     case 'debug': return 1;
-    case 'success': return 0;
     default: return 0;
   }
 }
 
-/**
- * Строит граф (nodes + edges) из сырых логов одного requestId.
- *
- * Алгоритм: стековый подход по порядку timestamps.
- * - Новый сервис → request (push на стек)
- * - Возврат к сервису уже в стеке → response (pop до него)
- * - Повторный вызов (после pop) → новый request
- */
+function shortenLabel(msg: string): string {
+  let label = msg;
+
+  label = label.replace(/\s*\|.*$/, '');
+  label = label.replace(/\s*Started At:.*$/i, '');
+  label = label.replace(/https?:\/\/[^\s|,]+/g, '');
+  label = label.replace(/url=[^\s,]*/g, '');
+  label = label.replace(/\?[^\s|,]*/g, '');
+  label = label.replace(/\{[^}]*\}/g, '');
+  label = label.replace(/body=\S*/g, '');
+  label = label.replace(/data:\s*\S*/g, '');
+  label = label.replace(/\/api\/v\d+\/tbapi\/\w+\/\w*/g, (m) => {
+    const parts = m.split('/').filter(Boolean);
+    return parts[parts.length - 1] || m;
+  });
+  label = label.replace(/,\s*,/g, ',');
+  label = label.replace(/\s{2,}/g, ' ');
+  label = label.replace(/[—\-,\s]+$/, '');
+  label = label.replace(/^[—\-,\s]+/, '');
+
+  return label.trim() || msg.slice(0, 50);
+}
+
 export function buildGraphFromLogs(logs: Log[]): RequestFlow {
   if (logs.length === 0) return { nodes: [], edges: [] };
 
@@ -65,7 +74,6 @@ export function buildGraphFromLogs(logs: Log[]): RequestFlow {
     (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
   );
 
-  // ── Собираем уникальные сервисы и их worst level ──
   const serviceOrder: string[] = [];
   const worstLevel: Record<string, LogLevel> = {};
 
@@ -79,7 +87,6 @@ export function buildGraphFromLogs(logs: Log[]): RequestFlow {
     }
   }
 
-  // ── Nodes ──
   const nodes: FlowNode[] = serviceOrder.map((name, i) => ({
     id: `n-${i}`,
     name,
@@ -87,26 +94,24 @@ export function buildGraphFromLogs(logs: Log[]): RequestFlow {
     status: worstLevel[name] === 'error' ? 'error' as const : 'success' as const,
   }));
 
-  // ── Edges: один проход по sorted логам ──────────────────────────────────
-  // serviceMsg обновляется на каждый лог → даёт "последнее сообщение" сервиса
-  // Request label = serviceMsg[sender] (что отправитель делает)
-  // Response label = serviceMsg[responder] (что ответчик ответил)
-
   const edges: FlowEdge[] = [];
   const stack: string[] = [];
   const requestTime: Record<string, number> = {};
   const serviceMsg: Record<string, string> = {};
+  const serviceLastLogId: Record<string, string> = {};
+  const serviceLastErrorLogId: Record<string, string> = {};
   let edgeId = 0;
   let firstError = true;
   let prevService = '';
 
   for (const log of sorted) {
     const ts = new Date(log.timestamp).getTime();
-
-    // Всегда обновляем последнее сообщение сервиса
     serviceMsg[log.service] = log.message;
+    serviceLastLogId[log.service] = log.id;
+    if (log.level === 'error' || log.level === 'warn') {
+      serviceLastErrorLogId[log.service] = log.id;
+    }
 
-    // Пропускаем если тот же сервис (нет перехода)
     if (log.service === prevService) continue;
     prevService = log.service;
 
@@ -121,7 +126,6 @@ export function buildGraphFromLogs(logs: Log[]): RequestFlow {
     const stackIdx = stack.indexOf(log.service);
 
     if (stackIdx !== -1) {
-      // Сервис уже в стеке → response (pop до него)
       while (stack.length > stackIdx + 1) {
         const from = stack.pop()!;
         const to = stack[stack.length - 1];
@@ -137,17 +141,15 @@ export function buildGraphFromLogs(logs: Log[]): RequestFlow {
           timestamp: log.timestamp,
           status: isErr ? 'error' : 'success',
           duration: duration > 0 ? duration : undefined,
-          label: isErr ? serviceMsg[from] : (duration > 0 ? `${duration}ms` : undefined),
+          label: isErr ? shortenLabel(serviceMsg[from]) : undefined,
           isErrorSource: isErr && firstError ? true : undefined,
+          relatedLogId: (isErr && serviceLastErrorLogId[from]) || serviceLastLogId[from],
         });
 
         if (isErr && firstError) firstError = false;
       }
     } else {
-      // Новый сервис → request
-      // label = последнее сообщение ОТПРАВИТЕЛЯ (что он делает/куда шлёт)
       const sender = stack[stack.length - 1];
-
       edges.push({
         id: `e-${edgeId++}`,
         from: sender,
@@ -155,16 +157,15 @@ export function buildGraphFromLogs(logs: Log[]): RequestFlow {
         type: 'request',
         timestamp: log.timestamp,
         status: 'success',
-        label: serviceMsg[sender],
+        label: shortenLabel(serviceMsg[sender]),
+        relatedLogId: serviceLastLogId[sender],
       });
       stack.push(log.service);
       requestTime[log.service] = ts;
     }
   }
 
-  // ── Закрываем оставшийся стек (финальные response) ──
   const lastTs = new Date(sorted[sorted.length - 1].timestamp).getTime();
-
   while (stack.length > 1) {
     const from = stack.pop()!;
     const to = stack[stack.length - 1];
@@ -180,8 +181,9 @@ export function buildGraphFromLogs(logs: Log[]): RequestFlow {
       timestamp: sorted[sorted.length - 1].timestamp,
       status: isErr ? 'error' : 'success',
       duration: duration > 0 ? duration : undefined,
-      label: isErr ? serviceMsg[from] : (duration > 0 ? `${duration}ms` : undefined),
+      label: isErr ? shortenLabel(serviceMsg[from]) : undefined,
       isErrorSource: isErr && firstError ? true : undefined,
+      relatedLogId: (isErr && serviceLastErrorLogId[from]) || serviceLastLogId[from],
     });
 
     if (isErr && firstError) firstError = false;
@@ -190,16 +192,7 @@ export function buildGraphFromLogs(logs: Log[]): RequestFlow {
   return { nodes, edges };
 }
 
-// ─── Build sequence for rendering ────────────────────────────────────────────
-
-/**
- * Преобразует рёбра графа в массив SeqEvent для отрисовки.
- * Каждое ребро (FlowEdge) = одна стрелка на диаграмме.
- */
-export function buildSequence(
-  edges: FlowEdge[],
-  services: string[],
-): SeqEvent[] {
+export function buildSequence(edges: FlowEdge[], services: string[]): SeqEvent[] {
   if (edges.length === 0) return [];
 
   const colOf = (name: string): number => {
@@ -211,13 +204,14 @@ export function buildSequence(
     id: edge.id,
     fromCol: colOf(edge.from),
     toCol: colOf(edge.to),
-    label: edge.label || (edge.type === 'response'
-      ? (edge.status === 'error' ? 'Error' : `${edge.duration ? edge.duration + 'ms' : 'OK'}`)
+    label: edge.label ?? (edge.type === 'response'
+      ? (edge.status === 'error' ? 'Error' : 'OK')
       : `→ ${edge.to}`),
     status: edge.status,
     duration: edge.duration,
     isResponse: edge.type === 'response',
     timestamp: edge.timestamp,
     isErrorSource: edge.isErrorSource,
+    relatedLogId: edge.relatedLogId,
   }));
 }

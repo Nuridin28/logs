@@ -5,19 +5,18 @@ import type { LogLevel } from '../types';
 interface LevelChipProps {
   level: LogLevel;
   size?: ChipProps['size'];
-  iconSize?: number;
 }
 
-export default function LevelChip({ level, size = 'small', iconSize = 16 }: LevelChipProps) {
+export default function LevelChip({ level, size = 'small' }: LevelChipProps) {
   const { Icon, color } = LEVEL_CONFIG[level];
   return (
     <Chip
-      icon={<Icon sx={{ fontSize: iconSize }} />}
+      icon={<Icon sx={{ fontSize: 14 }} />}
       label={level.toUpperCase()}
       color={color}
       size={size}
       variant="outlined"
-      sx={{ fontWeight: 500 }}
+      sx={{ fontWeight: 600 }}
     />
   );
 }

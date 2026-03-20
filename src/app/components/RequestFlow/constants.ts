@@ -1,28 +1,14 @@
 import type { ComponentType } from 'react';
 import type { SvgIconProps } from '@mui/material';
 import {
-  Storage,
-  Error as ErrorIcon,
-  Smartphone,
-  Dns,
-  Hub,
-  Cloud,
-  Memory,
-  Warning,
-  CheckCircle,
-  Info as InfoIcon,
-  BugReport,
+  Storage, Error as ErrorIcon, Smartphone, Dns, Hub, Cloud, Memory,
+  Warning, CheckCircle, Info as InfoIcon, BugReport,
 } from '@mui/icons-material';
-
 import type { LogLevel, NodeType, Status, LevelConfigEntry } from './types';
 
-// ─── Layout ──────────────────────────────────────────────────────────────────
-
-export const COL_W = 160;
+export const COL_W = 180;
 export const TS_W = 80;
-export const ROW_H = 64;
-
-// ─── Colors ──────────────────────────────────────────────────────────────────
+export const ROW_H = 68;
 
 export const SERVICE_COLORS = [
   '#2563eb', '#7c3aed', '#0891b2', '#059669', '#d97706',
@@ -42,8 +28,6 @@ export const LEVEL_COLORS: Record<LogLevel, string> = {
   success: '#22c55e',
   debug: '#8b5cf6',
 };
-
-// ─── Icon / chip configs ─────────────────────────────────────────────────────
 
 export const LEVEL_CONFIG: Record<LogLevel, LevelConfigEntry> = {
   error: { Icon: ErrorIcon, color: 'error' },
