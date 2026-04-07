@@ -1,9 +1,5 @@
-import type { ComponentType } from 'react';
-import type { ChipProps, SvgIconProps } from '@mui/material';
-
-export type LogLevel = 'info' | 'warn' | 'error' | 'debug' | 'success';
-export type NodeType = 'client' | 'gateway' | 'service' | 'database' | 'external' | 'cache';
 export type Status = 'success' | 'error' | 'pending';
+export type NodeType = 'client' | 'gateway' | 'service' | 'database' | 'external' | 'cache';
 
 export interface FlowEdge {
   id: string;
@@ -24,11 +20,6 @@ export interface FlowNode {
   status: Status;
 }
 
-export interface RequestFlow {
-  nodes: FlowNode[];
-  edges: FlowEdge[];
-}
-
 export interface SeqEvent {
   id: string;
   fromCol: number;
@@ -38,24 +29,7 @@ export interface SeqEvent {
   status: Status;
   duration?: number;
   isResponse: boolean;
-  timestamp: string;
   isErrorSource?: boolean;
-}
-
-export interface LevelConfigEntry {
-  Icon: ComponentType<SvgIconProps>;
-  color: ChipProps['color'];
-}
-
-export interface Log {
-  id: string;
-  timestamp: string;
-  container: string;
-  service: string;
-  level: LogLevel;
-  message: string;
-  host: string;
-  requestId?: string;
 }
 
 export interface RequestFlowProps {

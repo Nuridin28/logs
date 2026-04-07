@@ -20,7 +20,6 @@ export default function RequestFlow({ requestId, edges, onViewLog }: RequestFlow
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   const nodes = useMemo(() => deriveNodes(edges), [edges]);
-
   const services = useMemo(() => nodes.map((n) => n.name), [nodes]);
 
   const serviceTypes = useMemo(() => {
@@ -36,9 +35,7 @@ export default function RequestFlow({ requestId, edges, onViewLog }: RequestFlow
   }, [nodes]);
 
   const seqEvents = useMemo(() => buildSequence(edges, services), [edges, services]);
-
   const errorEdge = edges.find((e) => e.isErrorSource);
-
   const totalDuration = edges.reduce((sum, e) => sum + (e.duration ?? 0), 0);
 
   const toggle = (id: string) =>
@@ -162,9 +159,7 @@ export default function RequestFlow({ requestId, edges, onViewLog }: RequestFlow
                       borderRight: `1px solid ${isDark ? alpha('#fff', 0.04) : alpha('#000', 0.04)}`,
                       gap: 0.25,
                     }}>
-                      <Typography variant="caption" fontFamily="monospace" sx={{
-                        fontSize: '0.5rem', color: 'text.disabled', fontWeight: 500,
-                      }}>
+                      <Typography variant="caption" fontFamily="monospace" sx={{ fontSize: '0.5rem', color: 'text.disabled', fontWeight: 500 }}>
                         #{idx + 1}
                       </Typography>
                       {ev.isResponse
@@ -199,7 +194,9 @@ export default function RequestFlow({ requestId, edges, onViewLog }: RequestFlow
                     {ev.description && (
                       <Box sx={{
                         mx: 2, my: 0.5, p: 2,
-                        bgcolor: isDark ? alpha(ev.status === 'error' ? '#ef4444' : getColor(activeCol), 0.04) : alpha(ev.status === 'error' ? '#ef4444' : getColor(activeCol), 0.02),
+                        bgcolor: isDark
+                          ? alpha(ev.status === 'error' ? '#ef4444' : getColor(activeCol), 0.04)
+                          : alpha(ev.status === 'error' ? '#ef4444' : getColor(activeCol), 0.02),
                         border: `1px solid ${alpha(ev.status === 'error' ? '#ef4444' : getColor(activeCol), 0.12)}`,
                         borderRadius: '6px',
                       }}>

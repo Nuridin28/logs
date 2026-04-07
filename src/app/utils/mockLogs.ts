@@ -1,22 +1,33 @@
-import type { FlowEdge, Log, LogLevel } from '../components/RequestFlow';
+import type { FlowEdge } from '../components/RequestFlow';
 
-export type { FlowEdge, FlowNode, Log, LogLevel } from '../components/RequestFlow';
+export type { FlowEdge } from '../components/RequestFlow';
+
+export type LogLevel = 'info' | 'warn' | 'error' | 'debug' | 'success';
+
+export interface Log {
+  id: string;
+  timestamp: string;
+  container: string;
+  service: string;
+  level: LogLevel;
+  message: string;
+  host: string;
+  requestId?: string;
+}
 
 export const mockEdges: Record<string, FlowEdge[]> = {
   '5e355c48-868a-42c6-9cc9-25500a8e1de8': [
     { id: 'e-1', from: 'BFF', to: 'GraphQL Orchestrator', type: 'request', status: 'success', label: 'Outgoing GQL request — POST /graphql', description: 'query searchAddressOrchestrated, variables={gaid: DXB_E3279L_13610_005404040}' },
     { id: 'e-2', from: 'GraphQL Orchestrator', to: 'Address Management API', type: 'request', status: 'success', label: 'HTTP Outgoing Request — GET /addressManagement/search', description: 'query=DXB_E3279L_13610_005404040' },
-    { id: 'e-3', from: 'Address Management API', to: 'GraphQL Orchestrator', type: 'response', status: 'error', duration: 2, label: 'status=503, Request failed', description: 'Axios Incoming Response — status=503, Request failed with status code 503, url=/api/v1/tbapi/addressManagement/search', isErrorSource: true },
-    { id: 'e-4', from: 'GraphQL Orchestrator', to: 'BFF', type: 'response', status: 'error', duration: 29, label: 'INTERNAL_SERVER_ERROR', description: 'Error occurred while searching address — data: {searchAddress: null}, errors: [INTERNAL_SERVER_ERROR]' },
+    { id: 'e-3', from: 'Address Management API', to: 'GraphQL Orchestrator', type: 'response', status: 'error', duration: 2, label: 'status=503, Request failed', description: 'Axios Incoming Response — status=503, Request failed with status code 503', isErrorSource: true },
+    { id: 'e-4', from: 'GraphQL Orchestrator', to: 'BFF', type: 'response', status: 'error', duration: 29, label: 'INTERNAL_SERVER_ERROR', description: 'Error occurred while searching address — data: {searchAddress: null}' },
   ],
-
   'a1b2c3d4-e5f6-7890-abcd-ef1234567890': [
     { id: 'e-1', from: 'BFF', to: 'GraphQL Orchestrator', type: 'request', status: 'success', label: 'Outgoing GQL request — POST /graphql', description: 'query getAccountDetailsOrchestrated' },
     { id: 'e-2', from: 'GraphQL Orchestrator', to: 'Account Management API', type: 'request', status: 'success', label: 'HTTP Outgoing Request — GET /accountManagement/details', description: 'accountId=ACC-001' },
     { id: 'e-3', from: 'Account Management API', to: 'GraphQL Orchestrator', type: 'response', status: 'success', duration: 180, label: 'status=200', description: 'data={accountId: "ACC-001", name: "John Doe"}' },
     { id: 'e-4', from: 'GraphQL Orchestrator', to: 'BFF', type: 'response', status: 'success', duration: 420, label: 'status=200', description: '{getAccountDetails: {accountId: "ACC-001"}}' },
   ],
-
   'f7e6d5c4-b3a2-1098-7654-321fedcba987': [
     { id: 'e-1', from: 'BFF', to: 'GraphQL Orchestrator', type: 'request', status: 'success', label: 'Outgoing GQL request — POST /graphql', description: 'mutation createOrderOrchestrated, variables={orderId: "ORD-5521"}' },
     { id: 'e-2', from: 'GraphQL Orchestrator', to: 'Payment Management API', type: 'request', status: 'success', label: 'HTTP Outgoing Request — POST /paymentManagement/charge', description: 'orderId=ORD-5521' },
@@ -25,7 +36,6 @@ export const mockEdges: Record<string, FlowEdge[]> = {
     { id: 'e-5', from: 'Inventory Management API', to: 'GraphQL Orchestrator', type: 'response', status: 'success', duration: 200, label: 'status=200', description: 'reserved=true, itemId=ITEM-7712' },
     { id: 'e-6', from: 'GraphQL Orchestrator', to: 'BFF', type: 'response', status: 'success', duration: 750, label: 'status=200', description: '{createOrder: {orderId: "ORD-5521", status: "confirmed"}}' },
   ],
-
   'bb11cc22-dd33-ee44-ff55-667788990011': [
     { id: 'e-1', from: 'BFF', to: 'GraphQL Orchestrator', type: 'request', status: 'success', label: 'Outgoing GQL request — POST /graphql', description: 'query getBalanceOrchestrated, msisdn=971501234567' },
     { id: 'e-2', from: 'GraphQL Orchestrator', to: 'Balance Management API', type: 'request', status: 'success', label: 'HTTP Outgoing Request — GET /balanceManagement/balance', description: 'msisdn=971501234567' },

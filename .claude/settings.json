@@ -2,6 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(npx tsx -e ':*)"
+    ],
+    "additionalDirectories": [
+      "/Users/nuridinnurman/projects/almv/log/Logdisplayappdesign/src/app/utils"
     ]
   }
 }
