@@ -7,36 +7,21 @@ import {
 
 import type { NodeType, Status, RequestFlowProps } from './types';
 import { COL_W, TS_W, ROW_H } from './constants';
-import { getColor, buildSequence, buildGraphFromLogs, formatDuration, formatTimestamp } from './helpers';
+import { getColor, buildSequence, deriveNodes, formatDuration } from './helpers';
 
 import Card from './ui/Card';
 import EmptyState from './ui/EmptyState';
 import ErrorBanner from './ErrorBanner';
-import DetailPanel from './DetailPanel';
 import { Participant, SvgArrow, MsgLabel, Lifeline } from './SequenceDiagram';
 
-export default function RequestFlow({ requestId, logs, onViewLog }: RequestFlowProps) {
+export default function RequestFlow({ requestId, edges, onViewLog }: RequestFlowProps) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
-  const requestLogs = useMemo(
-    () => logs
-      .filter((log) => log.requestId === requestId)
-      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()),
-    [logs, requestId],
-  );
+  const nodes = useMemo(() => deriveNodes(edges), [edges]);
 
-  const flow = useMemo(() => buildGraphFromLogs(requestLogs), [requestLogs]);
-  const { nodes, edges } = flow;
-
-  const services = useMemo(() => {
-    const seen = new Set<string>();
-    return nodes.reduce<string[]>((acc, n) => {
-      if (!seen.has(n.name)) { seen.add(n.name); acc.push(n.name); }
-      return acc;
-    }, []);
-  }, [nodes]);
+  const services = useMemo(() => nodes.map((n) => n.name), [nodes]);
 
   const serviceTypes = useMemo(() => {
     const map: Record<string, NodeType> = {};
@@ -53,13 +38,8 @@ export default function RequestFlow({ requestId, logs, onViewLog }: RequestFlowP
   const seqEvents = useMemo(() => buildSequence(edges, services), [edges, services]);
 
   const errorEdge = edges.find((e) => e.isErrorSource);
-  const errorLog = errorEdge?.relatedLogId
-    ? requestLogs.find((l) => l.id === errorEdge.relatedLogId)
-    : undefined;
 
-  const totalDuration = requestLogs.length >= 2
-    ? new Date(requestLogs[requestLogs.length - 1].timestamp).getTime() - new Date(requestLogs[0].timestamp).getTime()
-    : 0;
+  const totalDuration = edges.reduce((sum, e) => sum + (e.duration ?? 0), 0);
 
   const toggle = (id: string) =>
     setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -75,13 +55,13 @@ export default function RequestFlow({ requestId, logs, onViewLog }: RequestFlowP
     }
   };
 
-  if (requestLogs.length === 0) {
+  if (edges.length === 0) {
     return (
       <EmptyState
         icon={ErrorIcon}
-        title="No logs found"
+        title="No flow data"
         description={
-          <>No logs for <Typography component="span" fontFamily="monospace" fontWeight={600}>{requestId}</Typography></>
+          <>No edges for <Typography component="span" fontFamily="monospace" fontWeight={600}>{requestId}</Typography></>
         }
       />
     );
@@ -108,13 +88,10 @@ export default function RequestFlow({ requestId, logs, onViewLog }: RequestFlowP
             <Chip label={formatDuration(totalDuration)} size="small" variant="outlined"
               color={totalDuration > 3000 ? 'warning' : 'default'} />
           )}
-          {requestLogs[0] && (
-            <Chip label={formatTimestamp(requestLogs[0].timestamp, { fractionalSeconds: true })} size="small" variant="outlined" />
-          )}
         </Box>
       </Box>
 
-      {errorEdge && <ErrorBanner edge={errorEdge} log={errorLog} isDark={isDark} />}
+      {errorEdge && <ErrorBanner edge={errorEdge} isDark={isDark} />}
 
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
         <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
@@ -166,11 +143,6 @@ export default function RequestFlow({ requestId, logs, onViewLog }: RequestFlowP
             {seqEvents.map((ev, idx) => {
               const isExp = expanded[ev.id] ?? false;
               const activeCol = ev.isResponse ? ev.fromCol : ev.toCol;
-              const activeService = ev.isResponse ? services[ev.fromCol] : services[ev.toCol];
-              const matchLog = (ev.relatedLogId
-                ? requestLogs.find((l) => l.id === ev.relatedLogId)
-                : requestLogs.find((l) => l.service === activeService)
-              ) ?? requestLogs[0];
 
               return (
                 <React.Fragment key={ev.id}>
@@ -224,10 +196,20 @@ export default function RequestFlow({ requestId, logs, onViewLog }: RequestFlowP
                   </Box>
 
                   <Collapse in={isExp}>
-                    {matchLog && (
-                      <DetailPanel log={matchLog}
-                        color={ev.status === 'error' ? '#ef4444' : getColor(activeCol)}
-                        isDark={isDark} onViewLog={onViewLog} />
+                    {ev.description && (
+                      <Box sx={{
+                        mx: 2, my: 0.5, p: 2,
+                        bgcolor: isDark ? alpha(ev.status === 'error' ? '#ef4444' : getColor(activeCol), 0.04) : alpha(ev.status === 'error' ? '#ef4444' : getColor(activeCol), 0.02),
+                        border: `1px solid ${alpha(ev.status === 'error' ? '#ef4444' : getColor(activeCol), 0.12)}`,
+                        borderRadius: '6px',
+                      }}>
+                        <Typography variant="body2" fontFamily="monospace" sx={{
+                          fontSize: '0.75rem', lineHeight: 1.6, wordBreak: 'break-word',
+                          color: ev.status === 'error' ? '#ef4444' : 'text.primary',
+                        }}>
+                          {ev.description}
+                        </Typography>
+                      </Box>
                     )}
                   </Collapse>
                 </React.Fragment>

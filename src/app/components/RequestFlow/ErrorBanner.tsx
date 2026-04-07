@@ -1,15 +1,14 @@
 import { Box, Typography, alpha } from '@mui/material';
 import { Error as ErrorIcon } from '@mui/icons-material';
-import type { FlowEdge, Log } from './types';
+import type { FlowEdge } from './types';
 import { formatDuration } from './helpers';
 
 interface ErrorBannerProps {
   edge: FlowEdge;
-  log?: Log;
   isDark: boolean;
 }
 
-export default function ErrorBanner({ edge, log, isDark }: ErrorBannerProps) {
+export default function ErrorBanner({ edge, isDark }: ErrorBannerProps) {
   return (
     <Box sx={{
       mb: 2, p: 1.5,
@@ -29,9 +28,9 @@ export default function ErrorBanner({ edge, log, isDark }: ErrorBannerProps) {
             </Typography>
           )}
         </Typography>
-        {log && (
+        {edge.label && (
           <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 0.25 }}>
-            {log.message.length > 120 ? log.message.slice(0, 120) + '...' : log.message}
+            {edge.label}
           </Typography>
         )}
       </Box>
